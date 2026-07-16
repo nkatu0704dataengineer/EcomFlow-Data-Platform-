@@ -1,0 +1,27 @@
+.git
+.env
+.DS_Store
+airflow_settings.yaml
+__pycache__/
+astro
+.venv
+.astro/standalone/
+airflow-webserver.pid
+webserver_config.py
+airflow.cfg
+airflow.db
+
+# IDE / Editor folders
+.vscode/
+.idea/
+
+# Testing & Python caches
+.pytest_cache/
+.coverage
+htmlcov/
+*.pyc
+
+# Local system / Temp files
+Thumbs.db
+*~
+*.log

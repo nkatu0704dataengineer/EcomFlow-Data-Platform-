@@ -1,0 +1,17 @@
+# Spark
+pyspark~=4.0
+delta-spark~=4.0
+
+# Object Storage
+minio~=7.2
+
+# Environment
+python-dotenv~=1.1
+numpy>=1.24
+pyarrow>=12.0.0
+
+# Databricks
+databricks-sdk~=0.63
+apache-airflow-providers-databricks~=7.5
+
+
