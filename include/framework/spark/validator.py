@@ -33,7 +33,10 @@ from include.framework.spark.models.validation_result import ValidationResult
 def collect_dataframe_metrics(df: DataFrame) -> tuple[int, int, dict[str, int]]:
     row_count = df.count()
     duplicate_count = row_count - df.dropDuplicates().count()
-    null_details = df.select([spark_sum(when(col(c).isNull(), 1).otherwise(0)).alias(c) for c in df.columns]).collect()[0].asDict()
+    
+    # Cache columns to avoid multiple RPC calls in Spark Connect
+    df_columns = df.columns
+    null_details = df.select([spark_sum(when(col(c).isNull(), 1).otherwise(0)).alias(c) for c in df_columns]).collect()[0].asDict()
 
     return row_count, duplicate_count, null_details
 
