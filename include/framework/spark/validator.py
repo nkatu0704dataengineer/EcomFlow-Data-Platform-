@@ -21,7 +21,7 @@ import sys
 import os
 
 # Add project root to Python path
-project_root = "/Workspace/Users/tumaxpro99@gmail.com/EcomFlow"
+project_root = "/Workspace/Users/tumaxpro99@gmail.com/EcomFlow-Data-Platform-"
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 

@@ -26,7 +26,7 @@ try:
     package_root = Path(__file__).resolve().parent.parent.parent.parent
 except NameError:
     # Databricks: __file__ not defined, use workspace path
-    package_root = Path("/Workspace/Users/tumaxpro99@gmail.com/EcomFlow")
+    package_root = Path("/Workspace/Users/tumaxpro99@gmail.com/EcomFlow-Data-Platform-")
 
 if str(package_root) not in sys.path:
     sys.path.insert(0, str(package_root))
