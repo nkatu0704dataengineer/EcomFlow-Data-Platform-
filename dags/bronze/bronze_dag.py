@@ -1,9 +1,16 @@
-"""EcomFlow Bronze DAG.
+"""
+EcomFlow Bronze DAG.
 
-Orchestrates the Bronze layer by triggering Databricks Bronze Jobs.
+Triggers the Databricks Bronze Workflow.
 
 Airflow is responsible only for orchestration.
-Spark execution and business logic are delegated to Databricks.
+
+Databricks is responsible for:
+    - Workflow execution
+    - Task dependency
+    - Notebook execution
+    - Spark runtime
+    - Business logic
 """
 
 from datetime import timedelta
@@ -20,13 +27,13 @@ START_DATE = pendulum.datetime(2026, 1, 1, tz=TIMEZONE)
 
 with DAG(
     dag_id="ecomflow_bronze",
-    description="Orchestrate EcomFlow Bronze datasets via Databricks Serverless",
+    description="Trigger the EcomFlow Bronze Workflow on Databricks",
     default_args=DEFAULT_ARGS,
     schedule="@daily",
     start_date=START_DATE,
     catchup=False,
     max_active_runs=1,
-    dagrun_timeout=timedelta(hours=3),
+    dagrun_timeout=timedelta(hours=5),
     tags=["ecomflow", "bronze", "databricks"],
 ) as dag:
 

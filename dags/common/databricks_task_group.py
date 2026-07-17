@@ -1,18 +1,14 @@
 """
-Databricks task group for the EcomFlow Bronze layer.
+Databricks task creation for EcomFlow.
 
-This module creates Airflow tasks that trigger the existing Databricks
-Bronze Job. Airflow is responsible only for orchestration.
+Airflow is responsible only for orchestration.
 
 Databricks is responsible for:
-    - Serverless compute
-    - Python Script execution
-    - Runtime environment
-    - Libraries
-    - Spark execution
-
-The Bronze Job receives dataset-specific runtime parameters and delegates
-all business logic to the EcomFlow framework.
+    - Workflow execution
+    - Task dependency
+    - Notebook execution
+    - Spark runtime
+    - Business logic
 """
 
 from __future__ import annotations
@@ -23,47 +19,19 @@ from include.config.databricks import get_databricks_conn_id
 from include.databricks.jobs import get_bronze_job_id
 
 
-def create_databricks_tasks(
-    dataset_configs: list[dict[str, str]],
-) -> list[DatabricksRunNowOperator]:
+def create_bronze_workflow_task() -> DatabricksRunNowOperator:
     """
-    Create Databricks RunNow tasks for every Bronze dataset.
-
-    Args:
-        dataset_configs:
-            Dataset runtime configuration.
+    Create a Databricks RunNowOperator that triggers the Bronze Workflow.
 
     Returns:
-        List of DatabricksRunNowOperator tasks.
+        Configured DatabricksRunNowOperator.
     """
 
-    conn_id = get_databricks_conn_id()
-    job_id = get_bronze_job_id()
-
-    tasks: list[DatabricksRunNowOperator] = []
-
-    for dataset in dataset_configs:
-        task = DatabricksRunNowOperator(
-            task_id=dataset["task_id"],
-            databricks_conn_id=conn_id,
-            job_id=job_id,
-            python_params=[
-                "--layer",
-                dataset["layer"],
-                "--catalog_name",
-                dataset["catalog_name"],
-                "--schema_name",
-                dataset["schema_name"],
-                "--table_name",
-                dataset["table_name"],
-                "--volume_name",
-                dataset["volume_name"],
-            ],
-            wait_for_termination=True,
-            polling_period_seconds=30,
-            do_xcom_push=False,
-        )
-
-        tasks.append(task)
-
-    return tasks
+    return DatabricksRunNowOperator(
+        task_id="run_bronze_workflow",
+        databricks_conn_id=get_databricks_conn_id(),
+        job_id=get_bronze_job_id(),
+        wait_for_termination=True,
+        polling_period_seconds=30,
+        do_xcom_push=False,
+    )

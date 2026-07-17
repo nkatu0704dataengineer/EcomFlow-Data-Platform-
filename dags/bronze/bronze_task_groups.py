@@ -1,23 +1,30 @@
-"""Bronze Airflow task group.
+"""
+Bronze Airflow task group.
 
-Orchestrates Bronze dataset processing via Databricks jobs.
-Each task submits the bronze_runner.py with dataset-specific parameters.
+This task group triggers the Databricks Bronze Workflow.
+
+Airflow is responsible only for orchestration.
+
+Databricks is responsible for:
+    - Workflow execution
+    - Task dependency
+    - Notebook execution
+    - Spark runtime
+    - Business logic
 """
 
 from airflow.decorators import task_group
 
-from dags.common.databricks_task_group import create_databricks_tasks
-from include.config.bronze import BRONZE_DATASETS
+from dags.common.databricks_task_group import create_bronze_workflow_task
 
 
 @task_group(group_id="bronze_task_group")
 def bronze_task_group():
-    """Create Bronze task group.
-    
-    Submits Databricks jobs for each Bronze dataset. Each task will:
-    1. Submit bronze_runner.py to Databricks Serverless
-    2. Pass dataset parameters as command-line arguments
-    3. Wait for job to complete
-    4. Return job status
     """
-    create_databricks_tasks(BRONZE_DATASETS)
+    Trigger the Databricks Bronze Workflow.
+
+    The workflow itself is responsible for executing all Bronze notebooks
+    according to the dependency graph defined in Databricks.
+    """
+
+    create_bronze_workflow_task()
