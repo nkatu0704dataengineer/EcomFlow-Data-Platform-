@@ -12,10 +12,14 @@ from typing import Final
 
 BRONZE_JOB_NAME: Final[str] = "EcomFlow Bronze Pipeline"
 BRONZE_JOB_ID: Final[int] = 590069787429591
+SILVER_JOB_NAME: Final[str] = "EcomFlow Silver Pipeline"
+SILVER_JOB_ID: Final[int] = 392046771671346
 
 _JOB_REGISTRY: Final[dict[str, int]] = {
     "bronze": BRONZE_JOB_ID,
     BRONZE_JOB_NAME.casefold(): BRONZE_JOB_ID,
+    "silver": SILVER_JOB_ID,
+    SILVER_JOB_NAME.casefold(): SILVER_JOB_ID,
 }
 
 
@@ -37,11 +41,23 @@ def get_bronze_job_id() -> int:
     """Return the Databricks job ID for the Bronze runner job."""
     return get_job_id("bronze")
 
+def get_silver_job_id() -> int:
+    """Return the Databricks job ID for the Silver runner job."""
+    return get_job_id("silver")
+
 
 __all__ = [
+    # Job IDs
     "BRONZE_JOB_ID",
+    "SILVER_JOB_ID",
+
+    # Job Names
     "BRONZE_JOB_NAME",
+    "SILVER_JOB_NAME",
+
+    # Helper Functions
     "get_bronze_job_id",
+    "get_silver_job_id",
     "get_databricks_job_registry",
     "get_job_id",
 ]

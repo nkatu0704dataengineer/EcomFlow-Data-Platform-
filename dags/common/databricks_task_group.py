@@ -35,3 +35,20 @@ def create_bronze_workflow_task() -> DatabricksRunNowOperator:
         polling_period_seconds=30,
         do_xcom_push=False,
     )
+
+def create_silver_workflow_task() -> DatabricksRunNowOperator:
+    """
+    Create a Databricks RunNowOperator that triggers the Silver Workflow.
+
+    Returns:
+        Configured DatabricksRunNowOperator.
+    """
+
+    return DatabricksRunNowOperator(
+        task_id="run_silver_workflow",
+        databricks_conn_id=get_databricks_conn_id(),
+        job_id=get_silver_job_id(),
+        wait_for_termination=True,
+        polling_period_seconds=30,
+        do_xcom_push=False,
+    )
