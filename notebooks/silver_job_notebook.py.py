@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 # Add package root to Python path
-package_root = Path("/Workspace/Users/tumaxpro99@gmail.com/EcomFlow")
+package_root = Path("/Workspace/Users/tumaxpro99@gmail.com/EcomFlow-Data-Platform-")
 if str(package_root) not in sys.path:
     sys.path.insert(0, str(package_root))
 
@@ -61,7 +61,7 @@ for idx, module_name in enumerate(SILVER_MODULES, 1):
     
     try:
         # Execute module by running its code with access to global spark session
-        module_file = f"/Workspace/Users/tumaxpro99@gmail.com/EcomFlow/notebooks/silver_job_notebook/{module_name}.py"
+        module_file = f"/Workspace/Users/tumaxpro99@gmail.com/EcomFlow-Data-Platform-/notebooks/silver_job_notebook/{module_name}.py"
         
         # Read and execute with globals() to give access to spark session
         with open(module_file, 'r') as f:

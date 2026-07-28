@@ -1,0 +1,23 @@
+WITH BRAND_STATS AS (
+SELECT 
+  P.BRAND_ID, B.BRAND_NAME, 
+  COUNT(*) AS TOTAL_ORDERS, 
+  SUM(O.QUANTITY) AS TOTAL_PRODUCTS_SOLD, 
+  ROUND(SUM(O.TOTAL_PRICE)/100000,5) AS TOTAL_REVENUE_OHT, 
+  ROUND(AVG(O.TOTAL_PRICE)/100000,5) AS AVG_ORDER_VALUE_OHT
+FROM 
+  ecomflow.ecom_silver.order_items AS O 
+  JOIN ecomflow.ecom_silver.products AS P ON 
+  O.PRODUCT_ID=P.PRODUCT_ID JOIN ecomflow.ecom_silver.brands 
+  AS B ON B.BRAND_ID=P.BRAND_ID
+GROUP BY P.BRAND_ID, B.BRAND_NAME
+)
+SELECT BRAND_ID, BRAND_NAME, TOTAL_ORDERS, TOTAL_PRODUCTS_SOLD, TOTAL_REVENUE_OHT, AVG_ORDER_VALUE_OHT,
+ROUND(
+    total_revenue_oht * 10000000.0 /
+    (SELECT SUM(total_amount)
+     FROM ecomflow.ecom_silver.orders),
+    2
+) AS revenue_share_pct
+FROM BRAND_STATS
+ORDER BY revenue_share_pct DESC
