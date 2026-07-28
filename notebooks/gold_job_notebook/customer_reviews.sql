@@ -1,5 +1,5 @@
 
-create or replace table ecomflow.ecom_gold.customer_reviews as 
+
 WITH review_stats AS (
     SELECT 
         O.ACC_ID,

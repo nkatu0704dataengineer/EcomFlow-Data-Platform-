@@ -1,5 +1,4 @@
 
-create or replace table ecomflow.ecom_gold.customer_360 as
 WITH CUS3601 AS (
     SELECT ACC_ID, COUNT(*) AS TOTAL_ORDERS, SUM(TOTAL_AMOUNT) AS
       TOTAL_SPENT, MIN(CREATED_AT) AS FIRSR_ORDER, MAX(created_at) AS LAST_ORDER

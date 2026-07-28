@@ -56,7 +56,7 @@ GOLD_TABLES = [
 ]
 
 # Configuration
-SQL_DIRECTORY = Path("/Workspace/Users/tumaxpro99@gmail.com/EcomFlow/notebooks/gold_job_notebook")
+SQL_DIRECTORY = Path("/Workspace/Users/tumaxpro99@gmail.com/EcomFlow-Data-Platform-/notebooks/gold_job_notebook")
 TARGET_CATALOG = "ecomflow"
 TARGET_SCHEMA = "ecom_gold"
 TARGET_VOLUME = "gold"

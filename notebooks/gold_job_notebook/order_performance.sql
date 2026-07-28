@@ -1,5 +1,5 @@
 
-create or replace table ecomflow.ecom_gold.order_performance as
+
 SELECT 
   YEAR(O.created_at) AS YEAR, 
   MONTH(O.created_at) AS MONTH, 

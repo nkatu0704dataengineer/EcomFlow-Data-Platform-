@@ -1,5 +1,5 @@
 
-create or replace table ecomflow.ecom_gold.subsidiary_shipping_performance as
+
 with brand_stats as (
  SELECT 
   OI.subsidiary_id,

@@ -1,5 +1,5 @@
 
-create or replace table ecomflow.ecom_gold.brand_reviewed as 
+
 WITH BRAND_REVIEWS AS (
   SELECT 
     P.brand_id,

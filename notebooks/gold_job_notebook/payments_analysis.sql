@@ -1,5 +1,5 @@
 
-CREATE OR REPLACE TABLE ecomflow.ecom_gold.payments_analysis AS
+
 WITH payment_stats1 AS (
   SELECT o.order_id, COUNT(*) AS total_items
   FROM ecomflow.ecom_silver.orders AS o 

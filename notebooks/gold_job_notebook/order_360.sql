@@ -1,5 +1,5 @@
 
-create or replace table ecomflow.ecom_gold.order_360 as
+
 WITH ORDER_STATS1 AS (
     SELECT 
       O.order_id,

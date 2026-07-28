@@ -1,5 +1,5 @@
 
-create or replace table ecomflow.ecom_gold.subsidiary_performance as
+
 SELECT 
   S.sub_id, 
   S.sub_name, 

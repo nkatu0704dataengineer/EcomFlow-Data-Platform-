@@ -1,5 +1,5 @@
 
-create or replace table ecomflow.ecom_gold.category_performance as
+
 WITH CATE_STATS AS (
 SELECT 
   C.cate_id,
