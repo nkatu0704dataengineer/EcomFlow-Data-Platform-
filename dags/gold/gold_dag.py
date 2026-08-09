@@ -28,7 +28,7 @@ with DAG(
     dag_id="ecomflow_gold",
     description="Trigger the EcomFlow Gold Workflow on Databricks",
     default_args=get_default_args(),
-    schedule="0 7,19 * * *",
+    schedule=None,
     start_date=START_DATE,
     catchup=False,
     max_active_runs=1,
