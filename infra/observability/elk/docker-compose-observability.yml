@@ -31,7 +31,9 @@ services:
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
 
     volumes:
+      - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
       - ecomflow_elasticsearch_data:/usr/share/elasticsearch/data
+      - ecomflow_elasticsearch_logs:/usr/share/elasticsearch/logs
 
     ports:
       - "9200:9200"
@@ -50,14 +52,16 @@ services:
   # ----------------------------------------------------------
   # Logstash
   # ----------------------------------------------------------
+  # Logstash configuration has two parts:
+  # 1. Node config (logstash.yml) - Uses defaults, no mount needed
+  # 2. Pipeline config (logstash.conf) - Custom processing logic
   logstash:
     image: docker.elastic.co/logstash/logstash:8.15.3
     container_name: ecomflow-logstash
     restart: unless-stopped
 
     volumes:
-      - ./infra/observability/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
-      - ./infra/observability/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
 
     ports:
       - "5044:5044"
@@ -82,7 +86,7 @@ services:
 
     volumes:
       # Filebeat configuration
-      - ./infra/observability/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
 
       # Existing Airflow logs - READ ONLY
       - ecom-flow_4149da_airflow_logs:/usr/local/airflow/logs:ro
@@ -110,7 +114,7 @@ services:
     restart: unless-stopped
 
     volumes:
-      - ./infra/observability/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+      - ./kibana.yml:/usr/share/kibana/config/kibana.yml:ro
 
     ports:
       - "5601:5601"
@@ -134,6 +138,9 @@ volumes:
 
   # Persistent Filebeat registry
   ecomflow_filebeat_data:
+
+  # Persistent Elasticsearch logs
+  ecomflow_elasticsearch_logs:
 
   # Existing Airflow log volume created by Astro.
   # IMPORTANT: do not create a new volume for Airflow logs.
