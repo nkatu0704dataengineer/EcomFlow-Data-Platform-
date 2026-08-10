@@ -1,1 +1,154 @@
-"jjj"
+# ============================================================
+# EcomFlow Observability - ELK Stack
+# ============================================================
+# Airflow remains managed by Astro.
+# This Compose file manages only the observability layer:
+#
+# Airflow logs
+#     -> Filebeat
+#     -> Logstash
+#     -> Elasticsearch
+#     -> Kibana
+#
+# Filebeat shares the existing Airflow log volume read-only.
+# All observability services join the existing Airflow network.
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # Elasticsearch
+  # ----------------------------------------------------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: ecomflow-elasticsearch
+    restart: unless-stopped
+
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+
+    volumes:
+      - ecomflow_elasticsearch_data:/usr/share/elasticsearch/data
+
+    ports:
+      - "9200:9200"
+
+    networks:
+      - ecom-flow_4149da_airflow
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+
+  # ----------------------------------------------------------
+  # Logstash
+  # ----------------------------------------------------------
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.15.3
+    container_name: ecomflow-logstash
+    restart: unless-stopped
+
+    volumes:
+      - ./infra/observability/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./infra/observability/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+
+    ports:
+      - "5044:5044"
+
+    networks:
+      - ecom-flow_4149da_airflow
+
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+
+  # ----------------------------------------------------------
+  # Filebeat
+  # ----------------------------------------------------------
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.15.3
+    container_name: ecomflow-filebeat
+    restart: unless-stopped
+
+    user: root
+
+    volumes:
+      # Filebeat configuration
+      - ./infra/observability/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+
+      # Existing Airflow logs - READ ONLY
+      - ecom-flow_4149da_airflow_logs:/usr/local/airflow/logs:ro
+
+      # Filebeat registry must survive container restarts
+      - ecomflow_filebeat_data:/usr/share/filebeat/data
+
+      # Docker socket for optional container metadata enrichment
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    networks:
+      - ecom-flow_4149da_airflow
+
+    depends_on:
+      logstash:
+        condition: service_started
+
+
+  # ----------------------------------------------------------
+  # Kibana
+  # ----------------------------------------------------------
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.3
+    container_name: ecomflow-kibana
+    restart: unless-stopped
+
+    volumes:
+      - ./infra/observability/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+
+    ports:
+      - "5601:5601"
+
+    networks:
+      - ecom-flow_4149da_airflow
+
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+
+# ============================================================
+# Volumes
+# ============================================================
+
+volumes:
+
+  # Persistent Elasticsearch index data
+  ecomflow_elasticsearch_data:
+
+  # Persistent Filebeat registry
+  ecomflow_filebeat_data:
+
+  # Existing Airflow log volume created by Astro.
+  # IMPORTANT: do not create a new volume for Airflow logs.
+  ecom-flow_4149da_airflow_logs:
+    external: true
+
+
+# ============================================================
+# Network
+# ============================================================
+
+networks:
+
+  # Existing Astro/Airflow network.
+  # Allows ELK services to communicate with Airflow infrastructure
+  # and share the Airflow log volume without modifying Airflow itself.
+  ecom-flow_4149da_airflow:
+    external: true
