@@ -1,1 +1,237 @@
-"aaa"
+# ============================================================
+# KIBANA - ECOMFLOW
+# ============================================================
+#
+# Purpose:
+#   Visualization and monitoring layer for EcomFlow logs.
+#
+# Flow:
+#
+#   Airflow
+#      ↓
+#   Filebeat
+#      ↓
+#   Logstash
+#      ↓
+#   Elasticsearch
+#      ↓
+#   Kibana
+#
+# Kibana is responsible for:
+#   - Searching logs
+#   - Visualizing logs
+#   - Monitoring Airflow execution
+#   - Investigating failures
+#   - Building operational dashboards
+#
+# Kibana is NOT responsible for:
+#   - Collecting logs
+#   - Parsing logs
+#   - Transforming logs
+#   - Storing logs
+#
+# Those responsibilities belong to Filebeat,
+# Logstash and Elasticsearch respectively.
+# ============================================================
+
+
+# ------------------------------------------------------------
+# SERVER
+# ------------------------------------------------------------
+
+# Kibana listens for HTTP requests here.
+# 0.0.0.0 required for Docker container networking.
+server.host: "0.0.0.0"
+
+# Port exposed by Kibana.
+server.port: 5601
+
+# Server name for identification in logs.
+server.name: "ecomflow-kibana"
+
+# Maximum payload size (default: 1048576 bytes = 1MB)
+# Increase if uploading large dashboards/visualizations.
+server.maxPayload: 1048576
+
+
+# ------------------------------------------------------------
+# ELASTICSEARCH
+# ------------------------------------------------------------
+
+# Elasticsearch backend used by Kibana.
+elasticsearch.hosts:
+  - "${ELASTICSEARCH_HOST:http://elasticsearch:9200}"
+
+# Request timeout when querying Elasticsearch.
+# Increase if complex queries timeout.
+elasticsearch.requestTimeout: 30000
+
+# Ping timeout for health checks.
+elasticsearch.pingTimeout: 3000
+
+# Elasticsearch authentication (disabled for now).
+# Enable when Elasticsearch security is configured.
+# elasticsearch.username: "${ELASTICSEARCH_USER:kibana_system}"
+# elasticsearch.password: "${ELASTICSEARCH_PASSWORD:}"
+
+
+# ------------------------------------------------------------
+# KIBANA INDEX
+# ------------------------------------------------------------
+
+# Index where Kibana stores its metadata (dashboards, visualizations, etc.).
+# Pattern: .kibana for standard setup.
+kibana.index: ".kibana"
+
+
+# ------------------------------------------------------------
+# ECOMFLOW ENVIRONMENT
+# ------------------------------------------------------------
+
+# Environment identification.
+# Useful when the same observability stack is later
+# deployed for dev / staging / production.
+ecomflow.environment: "${ENVIRONMENT:dev}"
+
+
+# ------------------------------------------------------------
+# SECURITY
+# ------------------------------------------------------------
+
+# X-Pack security (disabled, matching Elasticsearch).
+# Enable when implementing authentication/authorization.
+xpack.security.enabled: false
+
+# When enabling security (future):
+# xpack.security.enabled: true
+# xpack.security.encryptionKey: "${KIBANA_ENCRYPTION_KEY}"
+# xpack.security.session.idleTimeout: "1h"
+# xpack.security.session.lifespan: "30d"
+
+
+# ------------------------------------------------------------
+# MONITORING
+# ------------------------------------------------------------
+
+# Enable Kibana self-monitoring.
+# Metrics visible in Kibana Stack Monitoring.
+xpack.monitoring.enabled: true
+xpack.monitoring.kibana.collection.enabled: true
+
+# Monitoring data is stored in Elasticsearch.
+# Can be visualized in Kibana or sent to TIG stack later.
+
+
+# ------------------------------------------------------------
+# TELEMETRY
+# ------------------------------------------------------------
+
+# Disable telemetry to Elastic (privacy).
+# No data sent to external servers.
+telemetry.enabled: false
+telemetry.optIn: false
+
+
+# ------------------------------------------------------------
+# LOGGING
+# ------------------------------------------------------------
+
+# Kibana internal logging.
+logging.root.level: "${LOG_LEVEL:info}"
+
+# Log to stdout (captured by Docker).
+logging:
+  appenders:
+    console:
+      type: console
+      layout:
+        type: pattern
+  root:
+    level: "${LOG_LEVEL:info}"
+    appenders: [console]
+
+
+# ------------------------------------------------------------
+# STATUS PAGE
+# ------------------------------------------------------------
+
+# Allow anonymous access to status page.
+# Useful for health checks and monitoring.
+status.allowAnonymous: true
+
+
+# ------------------------------------------------------------
+# SAVED OBJECTS
+# ------------------------------------------------------------
+
+# Maximum number of saved objects that can be imported at once.
+# Default: 10000
+savedObjects.maxImportPayloadBytes: 26214400  # 25MB
+
+
+# ------------------------------------------------------------
+# PID FILE
+# ------------------------------------------------------------
+
+# PID file location (not needed in Docker, but set for completeness).
+pid.file: /run/kibana/kibana.pid
+
+
+# ============================================================
+# DASHBOARD DESIGN
+# ============================================================
+#
+# IMPORTANT:
+# The dashboard itself is NOT configured here.
+#
+# This section only documents the dashboard we intend to build
+# inside Kibana.
+#
+#
+#                 ECOMFLOW OBSERVABILITY
+# ============================================================
+#
+# ┌──────────────────────┬──────────────────────┬──────────────┐
+# │ DAG RUNS             │ TASK FAILURES        │ AVG DURATION │
+# │                      │                      │              │
+# │       128            │         3            │    4m 32s    │
+# │                      │                      │              │
+# └──────────────────────┴──────────────────────┴──────────────┘
+#
+#
+# ┌────────────────────────────────────────────────────────────┐
+# │              DAG EXECUTION OVER TIME                       │
+# │                                                            │
+# │   success  ███████████████████████████████                 │
+# │   failed   ███                                              │
+# │   running  ██                                               │
+# │                                                            │
+# │   07:00       09:00       11:00       13:00       15:00    │
+# └────────────────────────────────────────────────────────────┘
+#
+#
+# ┌──────────────────────────┬─────────────────────────────────┐
+# │ TOP FAILED DAGs          │ LOG LEVEL DISTRIBUTION           │
+# │                          │                                 │
+# │ ecomflow_bronze    2     │ INFO      ████████████████      │
+# │ ecomflow_silver    1     │ WARNING   ███                   │
+# │ ecomflow_gold      0     │ ERROR     ██                    │
+# │                          │ CRITICAL  ▏                     │
+# └──────────────────────────┴─────────────────────────────────┘
+#
+#
+# ┌────────────────────────────────────────────────────────────┐
+# │                    RECENT ERRORS                           │
+# ├────────────────────────────────────────────────────────────┤
+# │ 10:42  ecomflow_silver  Task failed                       │
+# │ 10:37  ecomflow_bronze  Databricks job timeout             │
+# │ 09:15  ecomflow_gold    Connection error                  │
+# └────────────────────────────────────────────────────────────┘
+#
+#
+# Dashboard objective:
+#
+#   "Mở Kibana lên → nhìn 1 màn hình → biết EcomFlow
+#    đang khỏe hay có vấn đề."
+#
+# ============================================================

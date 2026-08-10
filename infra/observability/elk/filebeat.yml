@@ -1,1 +1,136 @@
-"aaa"
+# ==========================================
+# FILEBEAT - ECOMFLOW
+# ==========================================
+# Purpose: Lightweight log shipper for Airflow logs
+# Flow: Airflow logs → Filebeat → Logstash → Elasticsearch → Kibana
+# ==========================================
+
+filebeat.inputs:
+
+  # ----------------------------------------
+  # Airflow logs
+  # ----------------------------------------
+  # Collects logs from all Airflow DAGs and tasks
+  # Covers: task execution logs, scheduler logs, DAG processor logs
+  - type: filestream
+    id: airflow-logs
+    enabled: true
+
+    paths:
+      - ${AIRFLOW_LOGS_PATH:/usr/local/airflow/logs}/**/*.log
+
+    # Exclude non-essential logs to reduce noise
+    exclude_files:
+      - '\.gitkeep$'
+      - 'filebeat.*'
+
+    # Parse multiline Python tracebacks and stack traces
+    parsers:
+      - multiline:
+          type: pattern
+          pattern: '^\[|^Traceback|^\s+'
+          negate: false
+          match: after
+
+    # Ensure Filebeat remembers position across restarts
+    # Critical for not losing log data when Filebeat container restarts
+    close_inactive: 5m
+    clean_inactive: 72h
+
+    # Add context to help identify log source in Kibana
+    fields:
+      log_source: airflow
+      component: orchestration
+    fields_under_root: false
+
+
+# ==========================================
+# PROCESSORS
+# ==========================================
+# Lightweight metadata enrichment only
+# Heavy parsing/transformation happens in Logstash
+
+processors:
+
+  # Add host metadata (hostname, OS, container ID)
+  - add_host_metadata:
+      when.not.has_fields: ['host.name']
+
+  # Add Docker container metadata if running in Docker
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+      match_source: true
+      match_short_id: true
+
+  # Add EcomFlow identification metadata
+  - add_fields:
+      target: ''
+      fields:
+        project: ecomflow
+        pipeline: observability
+        environment: ${ENVIRONMENT:dev}
+
+  # Drop debug-level Filebeat internal logs (reduces clutter)
+  - drop_event:
+      when:
+        regexp:
+          message: '^DBG'
+
+
+# ==========================================
+# OUTPUT
+# ==========================================
+# Send to Logstash for parsing/transformation
+# NOT directly to Elasticsearch (intentional separation of concerns)
+
+output.logstash:
+
+  hosts:
+    - "${LOGSTASH_HOST:logstash}:${LOGSTASH_PORT:5044}"
+
+  # Connection settings
+  timeout: 30
+  max_retries: 3
+  bulk_max_size: 2048
+
+  # Backpressure: slow down if Logstash is overwhelmed
+  # Prevents Filebeat from overwhelming downstream systems
+  slow_start: true
+
+  # Enable load balancing if multiple Logstash instances (future)
+  loadbalance: true
+
+
+# ==========================================
+# REGISTRY
+# ==========================================
+# Tracks which logs have been read to avoid duplication
+# MUST be on a Docker volume to survive container restarts
+
+filebeat.registry.path: ${REGISTRY_PATH:/usr/share/filebeat/data/registry}
+filebeat.registry.file_permissions: 0600
+filebeat.registry.flush: 5s
+
+
+# ==========================================
+# FILEBEAT LOGGING
+# ==========================================
+# Filebeat's own internal logs
+
+logging.level: ${LOG_LEVEL:info}
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+
+# ==========================================
+# MONITORING
+# ==========================================
+# Internal metrics for Filebeat health (optional, for future Grafana integration)
+
+http.enabled: true
+http.host: "0.0.0.0"
+http.port: 5066

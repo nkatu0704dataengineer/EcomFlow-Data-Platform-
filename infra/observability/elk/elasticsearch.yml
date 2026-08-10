@@ -1,1 +1,335 @@
-"aaa"
+# ============================================================
+# ELASTICSEARCH - ECOMFLOW OBSERVABILITY
+# ============================================================
+# Purpose: Storage and search engine for ELK log pipeline
+# Flow: Logstash → Elasticsearch → Kibana
+# Architecture: Single-node development/learning setup
+# ============================================================
+
+# ============================================================
+# CLUSTER SETTINGS
+# ============================================================
+# Single-node cluster for EcomFlow observability
+
+cluster.name: ecomflow-observability
+
+# Node identification
+node.name: ecomflow-es-node-01
+
+# Node roles: all roles on single node
+# master: cluster management
+# data: stores indices and executes queries
+# ingest: preprocessing pipelines (if needed later)
+node.roles: [ master, data, ingest ]
+
+
+# ============================================================
+# NETWORK SETTINGS
+# ============================================================
+# Docker container networking
+
+# Listen on all interfaces (required for Docker)
+network.host: 0.0.0.0
+
+# HTTP API port (Logstash, Kibana, REST API)
+http.port: 9200
+
+# Transport port (inter-node communication - unused in single-node)
+transport.port: 9300
+
+
+# ============================================================
+# DISCOVERY SETTINGS
+# ============================================================
+# Single-node mode: no cluster discovery needed
+
+# Disable bootstrap checks (development mode)
+discovery.type: single-node
+
+# This setting eliminates the need for:
+# - cluster.initial_master_nodes
+# - discovery.seed_hosts
+# - complex discovery configuration
+#
+# Perfect for local development and learning environments.
+
+
+# ============================================================
+# PATH SETTINGS
+# ============================================================
+# Data and log storage locations
+# These MUST be mounted to Docker volumes for persistence
+
+path.data: /usr/share/elasticsearch/data
+path.logs: /usr/share/elasticsearch/logs
+
+# CRITICAL: In docker-compose.yml, mount these paths:
+#   volumes:
+#     - elasticsearch-data:/usr/share/elasticsearch/data
+#     - elasticsearch-logs:/usr/share/elasticsearch/logs
+#
+# Without volume mounts, all data is lost on container restart.
+
+
+# ============================================================
+# MEMORY SETTINGS
+# ============================================================
+# JVM heap configuration
+# Rule of thumb: 50% of available RAM, but not more than 32GB
+#
+# For development: 512MB - 1GB is sufficient
+# For production: 4GB - 16GB typical
+#
+# Set via environment variables in docker-compose.yml:
+#   environment:
+#     - "ES_JAVA_OPTS=-Xms512m -Xmx512m"  # 512MB heap
+#
+# Do NOT set heap size here - use JVM options instead.
+
+# Memory lock: prevents JVM heap from being swapped to disk
+# Improves performance but requires Docker --ulimit memlock=-1
+bootstrap.memory_lock: false
+
+# Enable for production if system supports it:
+# bootstrap.memory_lock: true
+# Then in docker-compose.yml:
+#   ulimits:
+#     memlock:
+#       soft: -1
+#       hard: -1
+
+
+# ============================================================
+# PERFORMANCE SETTINGS
+# ============================================================
+# Appropriate for EcomFlow's log volume
+
+# Thread pool settings (using defaults)
+# Defaults are appropriate for most workloads
+# Only tune if profiling shows specific bottlenecks
+
+# Search thread pool: number of CPU cores is default
+# Index thread pool: number of CPU cores is default
+
+# Refresh interval: how often indices are refreshed for search
+# Default: 1s (one second)
+# Lower = more real-time, higher CPU
+# Higher = less real-time, lower CPU
+# Keep default for observability use case
+
+
+# ============================================================
+# INDEX SETTINGS
+# ============================================================
+# Default index configuration
+# Specific index templates should be defined separately
+
+# Number of shards per index
+# Single-node setup: 1 shard is optimal
+# Multi-node setup: more shards for parallelism
+action.auto_create_index: true
+
+# Default shard configuration (applied to new indices)
+# Logstash will create indices like: ecomflow-logs-dev-2024.01.15
+# These defaults will apply unless overridden by index templates
+
+# Note: Shard count is set at index creation and cannot be changed later
+# (only split/shrink operations can change it)
+
+
+# ============================================================
+# SECURITY SETTINGS
+# ============================================================
+# Basic security for development
+# Progressive security: start simple, harden incrementally
+
+# X-Pack security
+# Disabled initially for simplicity
+# Enable when implementing authentication/authorization
+xpack.security.enabled: false
+
+# When enabling security (future):
+# xpack.security.enabled: true
+# xpack.security.authc.api_key.enabled: true
+# xpack.security.transport.ssl.enabled: true
+# xpack.security.http.ssl.enabled: true
+#
+# Then configure:
+# - Built-in users (elastic, kibana_system, logstash_system)
+# - SSL/TLS certificates
+# - Role-based access control
+#
+# For now, rely on Docker network isolation.
+
+
+# ============================================================
+# MONITORING SETTINGS
+# ============================================================
+# Elasticsearch self-monitoring
+
+# X-Pack monitoring
+# Collect Elasticsearch metrics for observability
+# Can be visualized in Kibana or sent to TIG stack
+xpack.monitoring.enabled: true
+xpack.monitoring.collection.enabled: true
+
+# Monitoring indices retention
+# How long to keep monitoring data
+# Default: 7 days
+# Adjust based on storage constraints
+
+
+# ============================================================
+# LOGGING SETTINGS
+# ============================================================
+# Elasticsearch internal logs (not application logs)
+
+# Log level: DEBUG, INFO, WARN, ERROR
+# Default: INFO
+# Use DEBUG only for troubleshooting
+logger.level: INFO
+
+# Specific logger levels (optional)
+# logger.org.elasticsearch.discovery: DEBUG
+# logger.org.elasticsearch.index: WARN
+
+
+# ============================================================
+# CORS SETTINGS
+# ============================================================
+# Cross-Origin Resource Sharing
+# Required if accessing Elasticsearch from browser-based tools
+
+# Disabled by default (not needed for backend-only access)
+http.cors.enabled: false
+
+# Enable for browser-based Elasticsearch tools:
+# http.cors.enabled: true
+# http.cors.allow-origin: "*"
+# http.cors.allow-credentials: true
+# http.cors.allow-headers: Authorization,X-Requested-With,Content-Type,Content-Length
+
+
+# ============================================================
+# RETENTION & LIFECYCLE
+# ============================================================
+# Index Lifecycle Management (ILM)
+# Automates index rollover and deletion
+#
+# ILM is NOT configured here.
+# Define ILM policies separately via Kibana or API.
+#
+# Example ILM policy for EcomFlow logs:
+# 1. Rollover daily (already handled by Logstash index pattern)
+# 2. Hot phase: 7 days
+# 3. Delete phase: after 30 days
+#
+# This prevents disk from filling with old logs.
+# Implement after basic ELK stack is working.
+
+
+# ============================================================
+# ENVIRONMENT VARIABLES REFERENCE
+# ============================================================
+# The following environment variables can be used in docker-compose.yml:
+#
+# ES_JAVA_OPTS            - JVM options (heap size)
+#                           Example: "-Xms512m -Xmx512m"
+#
+# cluster.name            - Can be overridden via ES_CLUSTER_NAME
+# node.name               - Can be overridden via ES_NODE_NAME
+#
+# Example docker-compose.yml:
+#   elasticsearch:
+#     image: docker.elastic.co/elasticsearch/elasticsearch:8.x
+#     environment:
+#       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+#       - "discovery.type=single-node"
+#       - "xpack.security.enabled=false"
+#     volumes:
+#       - elasticsearch-data:/usr/share/elasticsearch/data
+#       - elasticsearch-logs:/usr/share/elasticsearch/logs
+#       - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+#     ports:
+#       - "9200:9200"
+#       - "9300:9300"
+#
+# volumes:
+#   elasticsearch-data:
+#   elasticsearch-logs:
+
+
+# ============================================================
+# TROUBLESHOOTING
+# ============================================================
+# Common issues and solutions:
+#
+# 1. "max virtual memory areas vm.max_map_count [65530] is too low"
+#    Solution (Linux host):
+#      sudo sysctl -w vm.max_map_count=262144
+#      echo "vm.max_map_count=262144" | sudo tee -a /etc/sysctl.conf
+#
+#    Solution (Docker Desktop on Mac/Windows):
+#      This is usually handled automatically
+#      If not, increase Docker Desktop memory allocation
+#
+# 2. "bootstrap checks failed: memory locking requested but not enabled"
+#    Solution: Set bootstrap.memory_lock: false (already set above)
+#
+# 3. "disk watermark [low/high] exceeded"
+#    Solution: Free disk space or adjust watermark settings:
+#      cluster.routing.allocation.disk.watermark.low: 90%
+#      cluster.routing.allocation.disk.watermark.high: 95%
+#
+# 4. Container exits immediately:
+#    Check logs: docker logs <container_name>
+#    Verify configuration syntax
+#    Verify volume mounts exist
+#
+# 5. Cannot connect from Logstash/Kibana:
+#    Verify Docker network connectivity
+#    Check elasticsearch service is running: curl http://localhost:9200
+#    Verify no firewall blocking ports
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+# Verify Elasticsearch is running:
+#
+# curl http://localhost:9200
+# curl http://localhost:9200/_cluster/health
+# curl http://localhost:9200/_cat/nodes?v
+# curl http://localhost:9200/_cat/indices?v
+#
+# Expected response:
+# {
+#   "name" : "ecomflow-es-node-01",
+#   "cluster_name" : "ecomflow-observability",
+#   "version" : { ... },
+#   "tagline" : "You Know, for Search"
+# }
+
+
+# ============================================================
+# PRODUCTION HARDENING CHECKLIST (Future)
+# ============================================================
+# When moving to production, consider:
+#
+# □ Enable xpack.security (authentication/authorization)
+# □ Configure SSL/TLS certificates
+# □ Enable bootstrap.memory_lock
+# □ Set up ILM policies for log retention
+# □ Configure backups (snapshot repository)
+# □ Set up monitoring/alerting
+# □ Tune JVM heap size based on data volume
+# □ Configure multiple nodes (if needed)
+# □ Set up dedicated master nodes (if scaling)
+# □ Configure shard allocation awareness
+# □ Review thread pool settings
+# □ Set up cross-cluster replication (if disaster recovery needed)
+# □ Implement index templates
+# □ Configure audit logging
+#
+# For EcomFlow's current scale, most of these are unnecessary.
+# Focus on making the basic ELK pipeline work first.
