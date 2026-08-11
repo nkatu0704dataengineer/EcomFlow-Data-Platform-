@@ -167,17 +167,14 @@ xpack.security.enabled: false
 # ============================================================
 # Elasticsearch self-monitoring
 
-# X-Pack monitoring
-# Collect Elasticsearch metrics for observability
-# Can be visualized in Kibana or sent to TIG stack
-xpack.monitoring.enabled: true
-xpack.monitoring.collection.enabled: true
 
 # Monitoring indices retention
 # How long to keep monitoring data
 # Default: 7 days
 # Adjust based on storage constraints
 
+# Elasticsearch monitoring is intentionally not configured here.
+# Metrics observability will be handled by the future TIG stack.
 
 # ============================================================
 # LOGGING SETTINGS
