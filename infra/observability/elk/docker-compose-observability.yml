@@ -77,6 +77,9 @@ services:
   # ----------------------------------------------------------
   # Filebeat
   # ----------------------------------------------------------
+  # Uses custom entrypoint to solve Windows bind mount permission issue.
+  # The entrypoint copies the read-only config to internal filesystem
+  # with strict permissions before starting Filebeat.
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.15.3
     container_name: ecomflow-filebeat
@@ -84,9 +87,16 @@ services:
 
     user: root
 
+    # Override default entrypoint to use our bootstrap script
+    entrypoint: ["/bin/bash", "/usr/local/bin/filebeat-entrypoint.sh"]
+
     volumes:
-      # Filebeat configuration
-      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      # Bootstrap script
+      - ./filebeat/entrypoint.sh:/usr/local/bin/filebeat-entrypoint.sh:ro
+
+      # Filebeat configuration (mounted to /tmp, not final location)
+      # The entrypoint will copy it to /usr/share/filebeat/filebeat.yml
+      - ./filebeat/filebeat.yml:/tmp/filebeat.yml:ro
 
       # Existing Airflow logs - READ ONLY
       - ecom-flow_4149da_airflow_logs:/usr/local/airflow/logs:ro
