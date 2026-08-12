@@ -125,7 +125,8 @@ services:
 
     volumes:
       - ./kibana.yml:/usr/share/kibana/config/kibana.yml:ro
-
+    tmpfs:
+      - /run/kibana:uid=1000,gid=1000,mode=0755
     ports:
       - "5601:5601"
 

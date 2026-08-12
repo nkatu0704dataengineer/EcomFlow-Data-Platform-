@@ -48,7 +48,7 @@ with DAG(
     dag_id="ecomflow_master",
     description="Orchestrates the complete EcomFlow Bronze-Silver-Gold pipeline",
     default_args=DEFAULT_ARGS,
-    schedule="0 7,19 * * *",
+    schedule="0 7 * * *",
     start_date=START_DATE,
     catchup=False,
     max_active_runs=1,

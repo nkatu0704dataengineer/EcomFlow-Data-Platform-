@@ -60,7 +60,7 @@ server.maxPayload: 1048576
 
 # Elasticsearch backend used by Kibana.
 elasticsearch.hosts:
-  - "${ELASTICSEARCH_HOST:http://elasticsearch:9200}"
+  - "http://elasticsearch:9200"
 
 # Request timeout when querying Elasticsearch.
 # Increase if complex queries timeout.
@@ -75,32 +75,13 @@ elasticsearch.pingTimeout: 3000
 # elasticsearch.password: "${ELASTICSEARCH_PASSWORD:}"
 
 
-# ------------------------------------------------------------
-# KIBANA INDEX
-# ------------------------------------------------------------
 
-# Index where Kibana stores its metadata (dashboards, visualizations, etc.).
-# Pattern: .kibana for standard setup.
-kibana.index: ".kibana"
-
-
-# ------------------------------------------------------------
-# ECOMFLOW ENVIRONMENT
-# ------------------------------------------------------------
-
-# Environment identification.
-# Useful when the same observability stack is later
-# deployed for dev / staging / production.
-ecomflow.environment: "${ENVIRONMENT:dev}"
 
 
 # ------------------------------------------------------------
 # SECURITY
 # ------------------------------------------------------------
 
-# X-Pack security (disabled, matching Elasticsearch).
-# Enable when implementing authentication/authorization.
-xpack.security.enabled: false
 
 # When enabling security (future):
 # xpack.security.enabled: true

@@ -21,7 +21,7 @@ filebeat.inputs:
 
     # Exclude non-essential logs to reduce noise
     exclude_files:
-      - '\.gitkeep
+      - '\.gitkeep'
       - 'filebeat.*'
 
     # Parse multiline Python tracebacks and stack traces

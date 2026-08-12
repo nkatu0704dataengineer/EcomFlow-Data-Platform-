@@ -34,7 +34,7 @@ def create_bronze_workflow_task() -> DatabricksRunNowOperator:
         databricks_conn_id=get_databricks_conn_id(),
         job_id=get_bronze_job_id(),
         wait_for_termination=True,
-        polling_period_seconds=30,
+        polling_period_seconds=5,
         do_xcom_push=False,
     )
 
@@ -51,7 +51,7 @@ def create_silver_workflow_task() -> DatabricksRunNowOperator:
         databricks_conn_id=get_databricks_conn_id(),
         job_id=get_silver_job_id(),
         wait_for_termination=True,
-        polling_period_seconds=30,
+        polling_period_seconds=5,
         do_xcom_push=False,
     )
 
@@ -68,6 +68,6 @@ def create_gold_workflow_task() -> DatabricksRunNowOperator:
         databricks_conn_id=get_databricks_conn_id(),
         job_id=get_gold_job_id(),
         wait_for_termination=True,
-        polling_period_seconds=30,
+        polling_period_seconds=5,
         do_xcom_push=False,
     )
