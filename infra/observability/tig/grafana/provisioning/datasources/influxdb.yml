@@ -1,0 +1,88 @@
+# ============================================================
+# EcomFlow Observability - Grafana InfluxDB Datasource
+# ============================================================
+# Purpose:
+#   Provision InfluxDB datasource automatically when Grafana starts.
+#   Allows Grafana to query Airflow metrics from InfluxDB.
+#
+# Architecture:
+#
+#   InfluxDB (ecomflow-influxdb:8086)
+#      │
+#      │ HTTP API (Flux query language)
+#      ▼
+#   Grafana Datasource (this file)
+#      │
+#      └── Dashboards query via this datasource
+#
+# Responsibility:
+#   ✓ Configure InfluxDB connection (URL, auth)
+#   ✓ Set default organization and bucket
+#   ✓ Enable Flux query language
+#   ✓ Auto-provision on Grafana startup
+# ============================================================
+
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB-EcomFlow
+    type: influxdb
+    access: proxy
+    
+    # ----------------------------------------------------------
+    # Connection Configuration
+    # ----------------------------------------------------------
+    # InfluxDB URL using Docker service name.
+    #
+    # IMPORTANT:
+    #   Must use service name "influxdb" (from docker-compose)
+    #   NOT "localhost" - containers communicate via Docker network
+    #
+    # FORMAT:
+    #   http://<service_name>:<port>
+    #
+    # MUST match influxdb.yml service name and port.
+    url: http://influxdb:8086
+    
+    # ----------------------------------------------------------
+    # Authentication
+    # ----------------------------------------------------------
+    # InfluxDB 2.x uses token-based authentication.
+    #
+    # SECURITY:
+    #   Token passed via environment variable.
+    #   MUST match INFLUXDB_TOKEN from influxdb.yml
+    #
+    # Grafana will substitute ${INFLUXDB_TOKEN} at runtime.
+    jsonData:
+      # InfluxDB version (2.x uses Flux query language)
+      version: Flux
+      
+      # Organization name
+      # MUST match INFLUXDB_ORG from influxdb.yml
+      organization: ${INFLUXDB_ORG}
+      
+      # Default bucket for queries
+      # MUST match INFLUXDB_BUCKET from influxdb.yml
+      defaultBucket: ${INFLUXDB_BUCKET}
+      
+      # Enable TLS/SSL (false for internal Docker network)
+      tlsSkipVerify: true
+    
+    # Secure settings (token authentication)
+    # Grafana will substitute ${INFLUXDB_TOKEN} at runtime
+    secureJsonData:
+      token: ${INFLUXDB_TOKEN}
+    
+    # ----------------------------------------------------------
+    # Datasource Behavior
+    # ----------------------------------------------------------
+    # Make this the default datasource for new dashboards
+    isDefault: true
+    
+    # Allow editing in UI (set false for production)
+    editable: false
+    
+    # Version (for configuration tracking)
+    version: 1
+

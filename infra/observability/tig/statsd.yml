@@ -1,1 +1,331 @@
-"aaa"
+# ============================================================
+# EcomFlow Observability - StatsD Input Configuration
+# ============================================================
+# Purpose:
+#   Receive Airflow metrics via StatsD protocol over UDP.
+#
+# Architecture:
+#
+#   Airflow
+#      │
+#      │ UDP :8125 (StatsD protocol)
+#      ▼
+#   Telegraf StatsD Input (this file)
+#      │
+#      ├── Receives & parses StatsD metrics
+#      ├── Aggregates counters/gauges/timers
+#      └── Forwards to Telegraf processing pipeline
+#
+# IMPORTANT:
+#   - This is NOT a standalone StatsD daemon configuration.
+#   - This configures Telegraf's built-in StatsD input plugin.
+#   - Metric processing, filtering, and InfluxDB output are
+#     configured separately in telegraf.yml.
+#
+# Responsibility Boundary:
+#   ✓ Receive UDP packets on port 8125
+#   ✓ Parse StatsD protocol (counters, gauges, timers, sets)
+#   ✓ Calculate percentiles for timer metrics
+#   ✓ Maintain metric state between flush intervals
+#   ✗ Metric filtering/dropping (telegraf.yml)
+#   ✗ Metric renaming/transformation (telegraf.yml)
+#   ✗ InfluxDB output (telegraf.yml)
+# ============================================================
+
+[[inputs.statsd]]
+
+  # ----------------------------------------------------------
+  # Network Configuration
+  # ----------------------------------------------------------
+  # Listen for StatsD metrics on UDP port 8125.
+  # Airflow will send metrics to this endpoint.
+  #
+  # Format: "<host>:<port>"
+  # - Empty host (":8125") means listen on all interfaces
+  # - Recommended for Docker/containerized deployments
+  service_address = ":8125"
+
+  # Protocol: UDP (StatsD standard)
+  # - No connection handshake
+  # - Fire-and-forget delivery
+  # - Metrics may be lost under network stress
+  # - Acceptable trade-off for observability use case
+
+
+  # ----------------------------------------------------------
+  # Metric Parsing
+  # ----------------------------------------------------------
+  # How to split metric names into components.
+  #
+  # Airflow metric format:
+  #   airflow.scheduler.heartbeat
+  #   airflow.dag.processing.total_parse_time
+  #   airflow.task_instance_created-<operator>
+  #
+  # Components are separated by periods (".").
+  # This matches Airflow's default StatsD naming convention.
+  metric_separator = "."
+
+  # DataDog extensions: DISABLED
+  # Airflow uses standard StatsD protocol, not DataDog-specific
+  # extensions (e.g., histogram type, service checks).
+  parse_data_dog_tags = false
+  datadog_extensions = false
+
+
+  # ----------------------------------------------------------
+  # Performance & Buffer Settings
+  # ----------------------------------------------------------
+  # Maximum number of unprocessed StatsD messages in memory.
+  #
+  # WHY THIS MATTERS:
+  #   When many Airflow tasks complete simultaneously,
+  #   Telegraf may receive bursts of metrics faster than
+  #   it can process them.
+  #
+  # TUNING GUIDANCE:
+  #   - 10,000 messages ≈ 1-2 MB memory
+  #   - Handles ~100 tasks completing within 1 second
+  #   - Increase if you see "allowed_pending_messages exceeded"
+  #     errors in Telegraf logs
+  allowed_pending_messages = 10000
+
+  # Maximum number of unique timer metrics tracked for percentiles.
+  #
+  # WHY THIS MATTERS:
+  #   Calculating percentiles requires keeping all timing values
+  #   in memory until the flush interval.
+  #
+  #   If Airflow generates many unique timer metrics
+  #   (e.g., task duration per DAG+task combination),
+  #   memory usage could grow unbounded.
+  #
+  # BEHAVIOR:
+  #   Once limit is reached, new timer metrics are ignored
+  #   (with a warning logged).
+  #
+  # TUNING GUIDANCE:
+  #   - 1,000 should handle most Airflow deployments
+  #   - Increase if you have > 200 DAGs with > 5 unique tasks each
+  percentile_limit = 1000
+
+
+  # ----------------------------------------------------------
+  # Metric Lifecycle & TTL
+  # ----------------------------------------------------------
+  # How long metrics remain in the StatsD cache after the last
+  # update before being automatically removed.
+  #
+  # WHY THIS MATTERS:
+  #   If Airflow stops sending a metric (e.g., a DAG is paused,
+  #   or scheduler crashes), the metric will continue reporting
+  #   its last value indefinitely unless we set a TTL.
+  #
+  # EXAMPLE:
+  #   - Scheduler sends heartbeat counter every 10 seconds
+  #   - Scheduler crashes at T=100s
+  #   - Without TTL: heartbeat metric reports last value forever
+  #   - With TTL=300s: heartbeat metric disappears at T=400s
+  #
+  # TUNING GUIDANCE:
+  #   - 300s (5 min) balances freshness vs. alert noise
+  #   - Too short: metrics flap during brief Airflow restarts
+  #   - Too long: stale metrics persist after component failures
+  max_ttl = "300s"
+
+  # Delete metrics after flushing to InfluxDB?
+  #
+  # CRITICAL DECISION:
+  #   We set all to FALSE because we want CONTINUOUS visibility.
+  #
+  # BEHAVIOR WHEN FALSE:
+  #   - Counters: Reset to 0 after flush, then accumulate new values
+  #   - Gauges: Retain last value until new value arrives
+  #   - Timers: Clear timing values but keep metric definition
+  #   - Sets: Clear set members but keep metric definition
+  #
+  # WHY FALSE IS CORRECT FOR AIRFLOW:
+  #   - We want to see "0 tasks failed" continuously, not gaps
+  #   - We want to see scheduler heartbeat even if unchanged
+  #   - Grafana dashboards expect continuous time series
+  #
+  # ALTERNATIVE (delete = true):
+  #   - Metrics only appear when Airflow sends new values
+  #   - Gaps in time series during idle periods
+  #   - Harder to distinguish "no activity" from "component down"
+  delete_counters = false
+  delete_gauges = false
+  delete_sets = false
+  delete_timings = false
+
+
+  # ----------------------------------------------------------
+  # Timer Metric Aggregation (Percentiles)
+  # ----------------------------------------------------------
+  # Which percentiles to calculate for timer/histogram metrics.
+  #
+  # AIRFLOW TIMER METRICS:
+  #   - airflow.dag.processing.total_parse_time
+  #   - airflow.task.duration
+  #   - airflow.scheduler.critical_section_duration
+  #
+  # PERCENTILE INTERPRETATION:
+  #   - p50  (median): Typical task duration
+  #   - p90  (90th):   Most tasks complete within this time
+  #   - p95  (95th):   SLA boundary (only 5% slower)
+  #   - p99  (99th):   Slow tasks (potential bottlenecks)
+  #   - p99.9 (99.9th): Outliers (usually infrastructure issues)
+  #
+  # GRAFANA USAGE:
+  #   - Show p50 as the main "task duration" line
+  #   - Show p95 as SLA threshold
+  #   - Alert when p99 exceeds threshold
+  #   - Investigate p99.9 spikes for root cause analysis
+  percentiles = [
+    50.0,   # Median - typical performance
+    90.0,   # 90th percentile
+    95.0,   # 95th percentile - SLA boundary
+    99.0,   # 99th percentile - tail latency
+    99.9    # 99.9th percentile - extreme outliers
+  ]
+
+
+  # ----------------------------------------------------------
+  # Metric Name Preservation
+  # ----------------------------------------------------------
+  # At this stage, we preserve Airflow's original metric names.
+  #
+  # EXAMPLES OF EXPECTED METRICS:
+  #
+  #   Scheduler:
+  #     airflow.scheduler.heartbeat (counter)
+  #     airflow.scheduler.critical_section_duration (timer)
+  #
+  #   DAG Processing:
+  #     airflow.dag_processing.total_parse_time (timer)
+  #     airflow.dag_processing.processes (gauge)
+  #
+  #   Task Execution:
+  #     airflow.task_instance_created-<operator> (counter)
+  #     airflow.task.duration.<dag_id>.<task_id> (timer)
+  #     airflow.task.success (counter)
+  #     airflow.task.failed (counter)
+  #
+  #   Executor:
+  #     airflow.executor.open_slots (gauge)
+  #     airflow.executor.queued_tasks (gauge)
+  #     airflow.executor.running_tasks (gauge)
+  #
+  # NAMING STRATEGY:
+  #   - Keep original names during initial implementation
+  #   - Observe real metric patterns for 1-2 weeks
+  #   - Then decide on normalization/filtering in telegraf.yml
+  #
+  # DO NOT apply aggressive transformations here.
+  # We want to see the raw Airflow metrics first.
+
+
+  # ----------------------------------------------------------
+  # Tags
+  # ----------------------------------------------------------
+  # Static tags can be added to all StatsD metrics.
+  #
+  # DECISION: NOT adding tags at this layer.
+  #
+  # REASONING:
+  #   - Tags should be added in telegraf.yml processor layer
+  #   - This allows us to add tags based on metric name patterns
+  #   - Example: tag metrics with "component=scheduler" based
+  #     on "airflow.scheduler.*" pattern
+  #
+  # FUTURE CONSIDERATION:
+  #   After observing real metrics, we may add tags in
+  #   telegraf.yml using:
+  #     [[processors.regex]]
+  #     [[processors.rename]]
+  #
+  # If you need to add static tags for ALL metrics (e.g.,
+  # environment, region), add them here:
+  #
+  # [inputs.statsd.tags]
+  #   environment = "production"
+  #   project = "ecomflow"
+  #   cluster = "airflow-main"
+
+
+  # ----------------------------------------------------------
+  # Flush Interval
+  # ----------------------------------------------------------
+  # How often aggregated metrics are forwarded to the next
+  # stage (processors → InfluxDB).
+  #
+  # NOTE: This is controlled by Telegraf's GLOBAL interval
+  #       setting in telegraf.yml, not here.
+  #
+  # RECOMMENDED VALUE: 10s
+  #
+  # REASONING:
+  #   - Balance between metric freshness and write load
+  #   - Airflow scheduler heartbeat is every 5-10 seconds
+  #   - 10s flush means at most 10s delay in Grafana
+  #   - Reduces InfluxDB write pressure vs. 1s flush
+  #
+  # This will be configured in telegraf.yml as:
+  #   [agent]
+  #   interval = "10s"
+
+
+# ============================================================
+# Configuration Validation Checklist
+# ============================================================
+#
+# Before deploying, verify:
+#
+# [ ] Port 8125/UDP is accessible from Airflow containers
+# [ ] Airflow statsd_host points to this Telegraf instance
+# [ ] Airflow statsd_port = 8125
+# [ ] Airflow statsd_prefix = "airflow" (or custom prefix)
+# [ ] Telegraf can write to InfluxDB (test in telegraf.yml)
+# [ ] No firewall blocking UDP 8125
+# [ ] allowed_pending_messages is sufficient for your DAG
+#     concurrency (increase if seeing buffer overrun errors)
+#
+# ============================================================
+
+
+# ============================================================
+# Troubleshooting Guide
+# ============================================================
+#
+# PROBLEM: No metrics appearing in InfluxDB
+#
+#   1. Check Airflow is sending metrics:
+#      - Look for statsd_* settings in airflow.cfg
+#      - Verify statsd_on = True
+#
+#   2. Check Telegraf is receiving UDP packets:
+#      - Run: tcpdump -i any udp port 8125 -n
+#      - Should see packets from Airflow container
+#
+#   3. Check Telegraf logs:
+#      - Look for "Error in plugin [inputs.statsd]"
+#      - Look for "allowed_pending_messages exceeded"
+#
+#   4. Verify metric_separator matches Airflow's format:
+#      - Check Airflow logs for actual metric names sent
+#      - Ensure they use period (".") as separator
+#
+# PROBLEM: High memory usage in Telegraf
+#
+#   - Check number of unique timer metrics
+#   - Reduce percentile_limit if needed
+#   - Consider filtering high-cardinality metrics
+#     in telegraf.yml
+#
+# PROBLEM: Missing timer percentiles in InfluxDB
+#
+#   - Verify percentile_limit not exceeded
+#   - Check Telegraf logs for "percentile_limit reached"
+#   - Increase limit or reduce unique timer metrics
+#
+# ============================================================

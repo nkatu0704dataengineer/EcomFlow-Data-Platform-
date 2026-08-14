@@ -1,1 +1,852 @@
-"aaa"
+# ============================================================
+# EcomFlow Observability - Telegraf Configuration
+# ============================================================
+# Purpose:
+#   Process and route Airflow metrics from the StatsD input
+#   layer into InfluxDB for time-series storage.
+#
+# Architecture:
+#
+#   Airflow
+#      │
+#      │ UDP :8125 (StatsD protocol)
+#      ▼
+#   [[inputs.statsd]] (defined in statsd.yml)
+#      │
+#      ├── Parses StatsD metrics
+#      ├── Calculates percentiles
+#      └── Forwards to Telegraf pipeline
+#      │
+#      ▼
+#   [agent] + Processors + Aggregators (this file)
+#      │
+#      ├── Global timing/buffering
+#      ├── Metric filtering/enrichment
+#      └── Pre-write aggregation
+#      │
+#      ▼
+#   [[outputs.influxdb_v2]] (this file)
+#      │
+#      └── Writes to InfluxDB time-series DB
+#      │
+#      ▼
+#   InfluxDB
+#      │
+#      ▼
+#   Grafana (future)
+#
+# Configuration Boundary:
+#   - statsd.yml:    StatsD input configuration ONLY
+#   - telegraf.yml:  Agent, processors, aggregators, outputs
+#
+# CRITICAL:
+#   Both files are loaded together as configuration fragments
+#   for a single Telegraf instance.
+#
+#   DO NOT duplicate [[inputs.statsd]] here.
+# ============================================================
+
+
+# ============================================================
+# 1. GLOBAL AGENT CONFIGURATION
+# ============================================================
+#
+# Purpose:
+#   Control Telegraf's global behavior: how frequently it
+#   collects metrics from inputs, processes them, and flushes
+#   them to outputs.
+#
+# Responsibility:
+#   ✓ Set collection/flush intervals
+#   ✓ Control metric buffering
+#   ✓ Set timestamp precision
+#   ✓ Configure jitter to avoid thundering herd
+#   ✓ Set metric batch sizes
+# ============================================================
+
+[agent]
+
+  # ----------------------------------------------------------
+  # Collection & Flush Intervals
+  # ----------------------------------------------------------
+  # How often Telegraf collects metrics from input plugins.
+  #
+  # COORDINATION WITH STATSD:
+  #   The StatsD input aggregates metrics continuously and
+  #   flushes them to the Telegraf pipeline at this interval.
+  #
+  # WHY 10 SECONDS:
+  #   - Balances metric freshness vs. InfluxDB write pressure
+  #   - Airflow scheduler heartbeat is ~5-10 seconds
+  #   - Provides near-real-time visibility in Grafana
+  #   - Reduces InfluxDB write load vs. 1s flush
+  #
+  # TUNING GUIDANCE:
+  #   - Decrease (5s): More responsive dashboards, higher write load
+  #   - Increase (30s): Lower write load, delayed visibility
+  #   - Must coordinate with InfluxDB retention/downsampling
+  interval = "10s"
+
+  # How often metrics are flushed to output plugins.
+  #
+  # CRITICAL:
+  #   Set equal to interval to maintain consistent timing.
+  #   Mismatched values can cause metric batching issues.
+  #
+  # BEHAVIOR:
+  #   Every 10 seconds:
+  #   1. StatsD input aggregates and forwards metrics
+  #   2. Processors transform them
+  #   3. Aggregators (if any) aggregate them
+  #   4. Output writes to InfluxDB
+  flush_interval = "10s"
+
+  # Random jitter added to flush_interval.
+  #
+  # WHY JITTER MATTERS:
+  #   In multi-instance deployments, synchronized flushes
+  #   can cause:
+  #   - InfluxDB write spikes
+  #   - Network congestion
+  #   - CPU usage spikes
+  #
+  # CURRENT VALUE: 0s
+  #   Single Telegraf instance = no jitter needed.
+  #
+  # FUTURE TUNING:
+  #   If deploying multiple Telegraf instances:
+  #   - Set to "2s" to spread writes across 10s window
+  #   - Smooths InfluxDB write load
+  flush_jitter = "0s"
+
+  # Timestamp precision for metrics.
+  #
+  # OPTIONS:
+  #   - "s"  (seconds):      Best for most use cases
+  #   - "ms" (milliseconds): Use if tracking sub-second events
+  #   - "us" (microseconds): Rarely needed
+  #   - "ns" (nanoseconds):  Avoid unless absolutely necessary
+  #
+  # WHY SECONDS:
+  #   - Airflow metrics are not sub-second precision
+  #   - Reduces storage overhead in InfluxDB
+  #   - 10s collection interval doesn't benefit from ms precision
+  #   - Task durations are typically seconds to minutes
+  #
+  # EXCEPTION:
+  #   If you need to track rapid task completions (< 1 second),
+  #   use "ms".
+  precision = "s"
+
+  # ----------------------------------------------------------
+  # Metric Buffering
+  # ----------------------------------------------------------
+  # Maximum number of metrics Telegraf buffers in memory
+  # before blocking input plugins.
+  #
+  # WHY THIS MATTERS:
+  #   If InfluxDB becomes slow or unavailable, metrics
+  #   accumulate in memory. This setting prevents unbounded
+  #   memory growth.
+  #
+  # BEHAVIOR:
+  #   - Buffer not full: Metrics queue in memory
+  #   - Buffer full: Input plugins block (StatsD stops reading UDP)
+  #   - UDP packets dropped at OS level
+  #
+  # SIZING GUIDANCE:
+  #   - 10,000 metrics ≈ 10 MB memory (rough estimate)
+  #   - 10s flush × 100 metrics/sec = 1,000 metrics/flush
+  #   - 10,000 buffer = ~10 flush cycles of buffering
+  #   - Handles ~100 seconds of InfluxDB downtime
+  #
+  # TUNING:
+  #   Increase if you see "metric buffer overflow" errors
+  #   during InfluxDB maintenance windows.
+  metric_buffer_limit = 10000
+
+  # Maximum number of metrics sent to output plugins per write.
+  #
+  # WHY THIS MATTERS:
+  #   Controls InfluxDB write batch size.
+  #   - Too small: Many small writes (higher InfluxDB overhead)
+  #   - Too large: Write timeouts, memory pressure
+  #
+  # BEHAVIOR:
+  #   If 5,000 metrics are ready:
+  #   - Sent as single 1,000-metric batch
+  #   - Followed by 1,000-metric batch
+  #   - ... (5 batches total)
+  #
+  # RECOMMENDED VALUE: 1000
+  #   - Balances write efficiency vs. latency
+  #   - Works well with InfluxDB's default settings
+  #   - Prevents individual write timeouts
+  metric_batch_size = 1000
+
+  # ----------------------------------------------------------
+  # Logging & Debugging
+  # ----------------------------------------------------------
+  # Log only errors by default to reduce noise.
+  #
+  # LEVELS (most to least verbose):
+  #   - "debug": All operations (very noisy)
+  #   - "info":  Normal operations
+  #   - "warn":  Warnings only
+  #   - "error": Errors only
+  #
+  # INITIAL VALUE: "error"
+  #   Quiet operation. Only log failures.
+  #
+  # TROUBLESHOOTING:
+  #   Change to "info" or "debug" when diagnosing:
+  #   - Missing metrics
+  #   - InfluxDB write failures
+  #   - Processor behavior
+  #
+  # IMPORTANT:
+  #   Set to "debug" temporarily, then revert to "error".
+  #   Debug logs can fill disk quickly.
+  debug = false
+  quiet = false
+  logtarget = "file"
+  logfile = "/var/log/telegraf/telegraf.log"
+  logfile_rotation_max_size = "10MB"
+  logfile_rotation_max_archives = 5
+
+  # Telegraf's internal hostname.
+  #
+  # WHY THIS MATTERS:
+  #   Added as "host" tag to all metrics.
+  #   Useful for multi-instance deployments.
+  #
+  # BEHAVIOR:
+  #   - Empty string (""): Uses OS hostname
+  #   - Explicit value: Overrides hostname
+  #
+  # DOCKER CONSIDERATION:
+  #   In Docker, OS hostname = container ID (not useful).
+  #   Set via environment variable in Docker Compose:
+  #     hostname: telegraf-ecomflow
+  #
+  # For now, let it default to OS hostname.
+  # hostname = ""
+
+  # Add "host" tag to all metrics?
+  #
+  # RECOMMENDATION: true
+  #   Helps distinguish metrics if you later deploy multiple
+  #   Telegraf instances.
+  #
+  # DISK IMPACT:
+  #   Minimal. The "host" tag adds ~20 bytes per unique metric.
+  omit_hostname = false
+
+
+# ============================================================
+# 2. INPUT LAYER
+# ============================================================
+#
+# The StatsD input is defined in statsd.yml.
+#
+# Data Flow:
+#
+#   Airflow → UDP :8125 → [[inputs.statsd]] (statsd.yml)
+#      │
+#      ├── Parses: counters, gauges, timers, sets
+#      ├── Calculates percentiles: p50, p90, p95, p99, p99.9
+#      ├── Buffers: 10,000 messages
+#      ├── TTL: 300 seconds
+#      └── Forwards to Telegraf pipeline (below)
+#
+# DO NOT define [[inputs.statsd]] here.
+#
+# Both statsd.yml and telegraf.yml are loaded together as
+# configuration fragments for a single Telegraf instance.
+#
+# EXPECTED AIRFLOW METRICS (from statsd.yml):
+#
+#   Scheduler:
+#     airflow.scheduler.heartbeat (counter)
+#     airflow.scheduler.critical_section_duration (timer)
+#
+#   DAG Processing:
+#     airflow.dag_processing.total_parse_time (timer)
+#     airflow.dag_processing.processes (gauge)
+#
+#   Task Execution:
+#     airflow.task_instance_created-<operator> (counter)
+#     airflow.task.duration.<dag_id>.<task_id> (timer)
+#     airflow.task.success (counter)
+#     airflow.task.failed (counter)
+#
+#   Executor:
+#     airflow.executor.open_slots (gauge)
+#     airflow.executor.queued_tasks (gauge)
+#     airflow.executor.running_tasks (gauge)
+#
+# All metrics use period (".") as separator.
+# No tags are added at the StatsD input layer.
+#
+# ============================================================
+
+
+# ============================================================
+# 3. PROCESSOR LAYER
+# ============================================================
+#
+# Purpose:
+#   Transform, filter, or enrich metrics before they reach
+#   aggregators and outputs.
+#
+# Common Processors:
+#   - [[processors.enum]]:       Map field values (e.g., 0→"ok")
+#   - [[processors.regex]]:      Extract tags from metric names
+#   - [[processors.rename]]:     Rename metrics/fields/tags
+#   - [[processors.converter]]:  Convert field types
+#   - [[processors.strings]]:    String transformations
+#   - [[processors.topk]]:       Keep only top-K metrics
+#   - [[processors.filter]]:     Drop metrics by pattern
+#
+# INITIAL STRATEGY:
+#   Keep processing MINIMAL.
+#
+# WHY:
+#   1. We haven't seen real Airflow metrics yet
+#   2. Premature optimization can hide valuable signals
+#   3. Easier to add processors than debug bad transformations
+#   4. Preserve original metric names for initial analysis
+#
+# DECISION:
+#   Observe metrics in InfluxDB/Grafana for 1-2 weeks.
+#   Then add processors based on real needs:
+#
+#   - Extract DAG ID / Task ID into tags (for filtering)
+#   - Add "environment=dev" tag
+#   - Filter out noisy/unused metrics
+#   - Normalize metric names if needed
+#
+# EXAMPLE (FUTURE):
+#
+#   # Extract DAG and task IDs from metric names
+#   [[processors.regex]]
+#     [[processors.regex.tags]]
+#       key = "metric"
+#       pattern = "^airflow\.task\.duration\.(?P<dag_id>[^\.]+)\.(?P<task_id>[^\.]+)"
+#       result_key = "dag_id"
+#
+#   # Add static environment tag
+#   [[processors.enum]]
+#     [[processors.enum.mapping]]
+#       tag = "environment"
+#       dest = "environment"
+#       [processors.enum.mapping.value_mappings]
+#         "*" = "dev"
+#
+# For now, NO processors are configured.
+# Metrics pass through unchanged from StatsD input to InfluxDB output.
+#
+# ============================================================
+
+
+# ============================================================
+# 4. AGGREGATOR LAYER
+# ============================================================
+#
+# Purpose:
+#   Perform additional time-based aggregation BEFORE writing
+#   to InfluxDB.
+#
+# WHY AGGREGATORS EXIST:
+#   - Reduce InfluxDB storage requirements
+#   - Pre-compute common aggregations (mean, min, max, sum)
+#   - Downsample high-frequency metrics
+#
+# CRITICAL DISTINCTION:
+#   - StatsD input: Aggregates raw UDP packets into metrics
+#   - Aggregators:  Aggregate those metrics over time windows
+#
+# EXAMPLE:
+#   - StatsD receives 1,000 task.success counters per 10s
+#   - StatsD aggregates to: task.success = 1,000 (sum)
+#   - This metric is flushed every 10s
+#
+#   WITHOUT aggregator:
+#     InfluxDB stores: 1 point every 10s
+#
+#   WITH aggregator (1-minute window):
+#     Aggregator collects 6 points (6 × 10s = 60s)
+#     Aggregator computes: min, max, mean, sum
+#     InfluxDB stores: 4 points every 60s
+#
+# COMMON AGGREGATORS:
+#   - [[aggregators.basicstats]]: min, max, mean, count, sum
+#   - [[aggregators.histogram]]:  Histogram buckets
+#   - [[aggregators.minmax]]:     Min and max only
+#   - [[aggregators.valuecounter]]: Count distinct values
+#
+# INITIAL STRATEGY:
+#   NO aggregators.
+#
+# WHY:
+#   1. 10-second resolution is acceptable for initial monitoring
+#   2. InfluxDB can handle the write load (10s intervals)
+#   3. Grafana can perform aggregations at query time
+#   4. We don't yet know which metrics need aggregation
+#
+# WHEN TO ADD AGGREGATORS:
+#   - InfluxDB storage grows too fast
+#   - Write load becomes problematic
+#   - Dashboards need pre-computed rollups (e.g., hourly task counts)
+#   - You implement InfluxDB retention policies with downsampling
+#
+# EXAMPLE (FUTURE):
+#
+#   # Aggregate task metrics into 1-minute summaries
+#   [[aggregators.basicstats]]
+#     period = "1m"
+#     drop_original = true
+#     stats = ["min", "max", "mean", "sum"]
+#     namepass = ["airflow.task.*"]
+#
+# For now, NO aggregators are configured.
+# All metrics from the StatsD input flow directly to InfluxDB output.
+#
+# ============================================================
+
+
+# ============================================================
+# 5. OUTPUT LAYER - InfluxDB v2
+# ============================================================
+#
+# Purpose:
+#   Write processed Airflow metrics to InfluxDB 2.x for
+#   time-series storage and Grafana querying.
+#
+# Responsibility:
+#   ✓ Authenticate with InfluxDB using token
+#   ✓ Write metrics to specified organization/bucket
+#   ✓ Handle write failures gracefully
+#   ✓ Retry on transient errors
+#   ✓ Buffer metrics during InfluxDB downtime
+#
+# InfluxDB 2.x Concepts:
+#   - Organization: Top-level tenant (e.g., "ecomflow")
+#   - Bucket: Time-series data container (e.g., "airflow_metrics")
+#   - Token: Authentication credential with read/write permissions
+#   - Measurement: Similar to a table (e.g., "airflow.task.duration")
+# ============================================================
+
+[[outputs.influxdb_v2]]
+
+  # ----------------------------------------------------------
+  # Connection Configuration
+  # ----------------------------------------------------------
+  # InfluxDB server URL(s).
+  #
+  # FORMAT:
+  #   - http://hostname:8086  (non-TLS)
+  #   - https://hostname:8086 (TLS)
+  #
+  # MULTIPLE URLS:
+  #   For high availability, list multiple InfluxDB instances:
+  #     urls = ["http://influxdb1:8086", "http://influxdb2:8086"]
+  #   Telegraf will round-robin writes.
+  #
+  # DOCKER DEPLOYMENT:
+  #   Use service name from docker-compose.yml:
+  #     urls = ["http://influxdb:8086"]
+  #
+  # ENVIRONMENT VARIABLE:
+  #   Set in docker-compose.yml or .env:
+  #     INFLUXDB_URL=http://influxdb:8086
+  urls = ["${INFLUXDB_URL}"]
+
+  # ----------------------------------------------------------
+  # Authentication
+  # ----------------------------------------------------------
+  # InfluxDB 2.x authentication token.
+  #
+  # OBTAINING THE TOKEN:
+  #   1. Log into InfluxDB UI (http://localhost:8086)
+  #   2. Go to: Data → Tokens → Generate Token
+  #   3. Create "Read/Write Token" with:
+  #      - Write access to target bucket
+  #      - Read access for validation (optional)
+  #
+  # SECURITY:
+  #   NEVER hardcode tokens in configuration files.
+  #   Always use environment variables.
+  #
+  # DOCKER DEPLOYMENT:
+  #   Set in docker-compose.yml:
+  #     environment:
+  #       INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
+  #
+  #   Store actual token in .env file (gitignored):
+  #     INFLUXDB_TOKEN=your-secret-token-here
+  token = "${INFLUXDB_TOKEN}"
+
+  # InfluxDB organization name.
+  #
+  # WHAT IS AN ORGANIZATION:
+  #   Top-level multi-tenancy unit in InfluxDB 2.x.
+  #   All buckets belong to an organization.
+  #
+  # COMMON VALUES:
+  #   - "ecomflow" (project-specific)
+  #   - "mycompany" (company-wide)
+  #   - "default" (InfluxDB's initial organization)
+  #
+  # FINDING YOUR ORGANIZATION:
+  #   1. InfluxDB UI → User menu (top-right)
+  #   2. Shows current organization name
+  #   3. Or: Settings → Organization Settings
+  organization = "${INFLUXDB_ORG}"
+
+  # Target InfluxDB bucket for Airflow metrics.
+  #
+  # WHAT IS A BUCKET:
+  #   Container for time-series data with retention policy.
+  #   Similar to a database in InfluxDB 1.x.
+  #
+  # NAMING CONVENTION:
+  #   Use descriptive names:
+  #   - "airflow_metrics" (clear, specific)
+  #   - "ecomflow_airflow" (project-prefixed)
+  #   - "observability_metrics" (broader scope)
+  #
+  # CREATING A BUCKET:
+  #   InfluxDB UI → Data → Buckets → Create Bucket
+  #   Set retention period (e.g., 30 days, 90 days, infinite)
+  #
+  # DOCKER SETUP:
+  #   Can be created via InfluxDB setup script or manually.
+  bucket = "${INFLUXDB_BUCKET}"
+
+  # ----------------------------------------------------------
+  # Write Behavior
+  # ----------------------------------------------------------
+  # Timeout for HTTP requests to InfluxDB.
+  #
+  # WHY THIS MATTERS:
+  #   If InfluxDB is slow, Telegraf will wait this long
+  #   before giving up and retrying.
+  #
+  # TUNING:
+  #   - Too short (< 5s): Unnecessary timeouts during load spikes
+  #   - Too long (> 30s): Telegraf blocks, metrics back up
+  #   - Recommended: 10-20s for most deployments
+  #
+  # INITIAL VALUE: 10s
+  #   Aggressive enough to fail fast, tolerant of brief slowdowns.
+  timeout = "10s"
+
+  # Compression for writes to InfluxDB.
+  #
+  # OPTIONS:
+  #   - "gzip": Good compression, moderate CPU
+  #   - "none": No compression, higher network usage
+  #
+  # RECOMMENDATION: "gzip"
+  #   - Reduces network bandwidth by ~70%
+  #   - InfluxDB decompresses efficiently
+  #   - Negligible CPU overhead
+  #
+  # WHEN TO DISABLE:
+  #   - Telegraf and InfluxDB on same host (localhost)
+  #   - CPU is the bottleneck (rare)
+  content_encoding = "gzip"
+
+  # ----------------------------------------------------------
+  # Error Handling & Retries
+  # ----------------------------------------------------------
+  # Maximum number of metrics to send per HTTP request.
+  #
+  # COORDINATION:
+  #   Should match agent.metric_batch_size (1000).
+  #
+  # WHY:
+  #   InfluxDB write performance is best with batches of
+  #   1,000-5,000 points. Too small = overhead, too large = timeouts.
+  # influx_uint_support = true
+
+  # Retry failed writes?
+  #
+  # CRITICAL: Set to true for production.
+  #
+  # BEHAVIOR WHEN true:
+  #   - Transient errors (network glitch, InfluxDB restart) → Retry
+  #   - Permanent errors (auth failure, bad data) → Drop and log
+  #
+  # RETRY STRATEGY:
+  #   - Exponential backoff
+  #   - Retries until metric_buffer_limit is reached
+  #   - Then metrics are dropped (logged as errors)
+  #
+  # BEHAVIOR WHEN false:
+  #   ALL write failures drop metrics immediately.
+  #   Use only for testing/development.
+  # retry_on_error = true  # Commented out; defaults to true
+
+  # Maximum time to retry failed writes.
+  #
+  # EXAMPLE:
+  #   - Write fails at T=0
+  #   - Telegraf retries every 10s
+  #   - After 5 minutes (30 retries), metrics are dropped
+  #
+  # TUNING:
+  #   - Short (1m): Fast failure, less memory pressure
+  #   - Long (10m): Better resilience, higher memory usage
+  #   - Must be less than time to fill metric_buffer_limit
+  #
+  # RECOMMENDED: 5m
+  #   Survives brief InfluxDB restarts without data loss.
+  # max_retry_time = "5m"  # Commented out; defaults to 5m
+
+  # ----------------------------------------------------------
+  # Metric Naming in InfluxDB
+  # ----------------------------------------------------------
+  # How to map Telegraf metrics to InfluxDB measurements.
+  #
+  # OPTIONS:
+  #   - "" (empty):       Use Telegraf metric name as measurement
+  #   - "custom_name":    Override measurement name
+  #
+  # INITIAL VALUE: "" (empty)
+  #   Preserve Airflow metric names:
+  #     airflow.scheduler.heartbeat → measurement = "airflow.scheduler.heartbeat"
+  #     airflow.task.success → measurement = "airflow.task.success"
+  #
+  # FUTURE TUNING:
+  #   After observing metrics, you might normalize:
+  #     All → measurement = "airflow_metrics"
+  #     Add tag: metric_type = "scheduler.heartbeat"
+  #
+  # For now, preserve original names.
+  # name_override = ""
+
+  # Additional tags to add to ALL metrics.
+  #
+  # DECISION: NOT adding tags here.
+  #
+  # REASONING:
+  #   1. No tags in StatsD input (by design)
+  #   2. No processors configured yet
+  #   3. Add tags after observing metric structure
+  #
+  # FUTURE CONSIDERATION:
+  #   Add environment/project tags here or in processors:
+  #
+  #   [outputs.influxdb_v2.tags]
+  #     environment = "dev"
+  #     project = "ecomflow"
+  #     component = "airflow"
+  #     region = "us-east-1"
+
+  # ----------------------------------------------------------
+  # TLS/SSL Configuration
+  # ----------------------------------------------------------
+  # Enable TLS for encrypted communication with InfluxDB.
+  #
+  # WHEN TO ENABLE:
+  #   - InfluxDB exposed over public internet
+  #   - Production deployments
+  #   - Compliance requirements (PCI, HIPAA, SOC2)
+  #
+  # WHEN TO DISABLE:
+  #   - Docker internal networks (http://influxdb:8086)
+  #   - Development/testing
+  #   - InfluxDB and Telegraf on same host
+  #
+  # INITIAL VALUE: Disabled
+  #   Both services run in same Docker network (no external exposure).
+  #
+  # ENABLING TLS:
+  #   # tls_ca = "/etc/telegraf/ca.pem"
+  #   # tls_cert = "/etc/telegraf/cert.pem"
+  #   # tls_key = "/etc/telegraf/key.pem"
+  #   # insecure_skip_verify = false
+
+  # ----------------------------------------------------------
+  # HTTP Headers
+  # ----------------------------------------------------------
+  # Add custom HTTP headers to InfluxDB write requests.
+  #
+  # USE CASES:
+  #   - Tracing/debugging (X-Request-ID)
+  #   - Custom authentication headers
+  #   - Routing hints for InfluxDB proxies
+  #
+  # INITIAL VALUE: None
+  #   Standard InfluxDB authentication uses token (above).
+  #
+  # EXAMPLE:
+  #   [outputs.influxdb_v2.http_headers]
+  #     "X-Telegraf-Instance" = "ecomflow-prod"
+  #     "X-Environment" = "production"
+
+
+# ============================================================
+# Configuration Validation Checklist
+# ============================================================
+#
+# Before deploying, verify:
+#
+# [ ] Both statsd.yml and telegraf.yml are loaded by Telegraf
+#     (Docker: mount both files, or concatenate them)
+#
+# [ ] Environment variables are set:
+#     - INFLUXDB_URL=http://influxdb:8086
+#     - INFLUXDB_TOKEN=<your-token>
+#     - INFLUXDB_ORG=<your-org>
+#     - INFLUXDB_BUCKET=<your-bucket>
+#
+# [ ] InfluxDB bucket exists with appropriate retention policy
+#
+# [ ] InfluxDB token has WRITE permission to the target bucket
+#
+# [ ] Telegraf can reach InfluxDB (test: curl $INFLUXDB_URL/health)
+#
+# [ ] Airflow statsd_host points to Telegraf container/host
+#
+# [ ] Airflow statsd_port = 8125
+#
+# [ ] Airflow statsd_on = True
+#
+# [ ] Port 8125/UDP is accessible from Airflow to Telegraf
+#
+# [ ] Telegraf log directory exists and is writable:
+#     /var/log/telegraf/
+#
+# [ ] Agent interval (10s) aligns with monitoring requirements
+#
+# ============================================================
+
+
+# ============================================================
+# Troubleshooting Guide
+# ============================================================
+#
+# PROBLEM: No metrics in InfluxDB
+#
+#   1. Check Telegraf is receiving StatsD metrics:
+#      - Telegraf logs: grep "statsd" /var/log/telegraf/telegraf.log
+#      - Network: tcpdump -i any udp port 8125 -n
+#
+#   2. Check Telegraf is writing to InfluxDB:
+#      - Telegraf logs: grep "influxdb_v2" telegraf.log
+#      - Look for "wrote batch" success messages
+#      - Look for "error writing to output" failures
+#
+#   3. Verify InfluxDB authentication:
+#      - Test token: curl -H "Authorization: Token $INFLUXDB_TOKEN" \
+#                    $INFLUXDB_URL/api/v2/buckets?org=$INFLUXDB_ORG
+#      - Should return JSON with bucket list
+#
+#   4. Check InfluxDB bucket exists:
+#      - InfluxDB UI → Data → Buckets
+#      - Or use CLI: influx bucket list
+#
+#   5. Verify Telegraf configuration is valid:
+#      - Run: telegraf --config telegraf.yml --config statsd.yml --test
+#      - Should output sample metrics to stdout
+#
+# PROBLEM: High memory usage in Telegraf
+#
+#   - Check metric_buffer_limit (currently 10,000)
+#   - Check InfluxDB write latency (timeout = 10s)
+#   - Reduce buffer or increase InfluxDB resources
+#
+# PROBLEM: InfluxDB write failures
+#
+#   - Check InfluxDB logs for errors
+#   - Verify network connectivity (ping, curl)
+#   - Check InfluxDB disk space (writes fail when disk is full)
+#   - Verify token permissions (read + write on bucket)
+#
+# PROBLEM: Metrics delayed in Grafana
+#
+#   - Check flush_interval (currently 10s)
+#   - Verify InfluxDB query performance
+#   - Check Grafana refresh interval
+#
+# PROBLEM: "metric buffer overflow" errors
+#
+#   - InfluxDB cannot keep up with write load
+#   - Increase metric_buffer_limit
+#   - Increase InfluxDB write capacity
+#   - Add aggregators to reduce metric volume
+#
+# ENABLING DEBUG LOGGING:
+#
+#   Temporarily change in [agent] section:
+#     debug = true
+#
+#   Restart Telegraf and check logs:
+#     tail -f /var/log/telegraf/telegraf.log
+#
+#   Look for:
+#     - "D!" prefix = debug messages
+#     - Metric samples being collected/written
+#     - HTTP request/response details for InfluxDB
+#
+#   CRITICAL: Revert to debug = false after troubleshooting.
+#   Debug logs grow very quickly.
+#
+# ============================================================
+
+
+# ============================================================
+# Next Steps
+# ============================================================
+#
+# After deploying this configuration:
+#
+# 1. START TELEGRAF
+#    - Load both statsd.yml and telegraf.yml
+#    - Verify no configuration errors
+#    - Check logs for successful InfluxDB writes
+#
+# 2. CONFIGURE AIRFLOW
+#    - Set statsd_on = True in airflow.cfg
+#    - Set statsd_host = <telegraf-hostname>
+#    - Set statsd_port = 8125
+#    - Restart Airflow components
+#
+# 3. VERIFY METRICS FLOW
+#    - Wait 30-60 seconds for initial metrics
+#    - Query InfluxDB:
+#        from(bucket: "airflow_metrics")
+#          |> range(start: -5m)
+#          |> filter(fn: (r) => r._measurement =~ /airflow.*/)
+#    - Should see Airflow metrics
+#
+# 4. OBSERVE METRIC PATTERNS (1-2 weeks)
+#    - Identify most important metrics
+#    - Identify noisy/unused metrics
+#    - Note metric naming patterns
+#    - Understand cardinality (unique metric combinations)
+#
+# 5. TUNE CONFIGURATION
+#    - Add processors to extract tags (dag_id, task_id)
+#    - Add filters to drop unused metrics
+#    - Add environment tags
+#    - Consider aggregators if write load is high
+#
+# 6. CONFIGURE GRAFANA
+#    - Add InfluxDB as data source
+#    - Create dashboards:
+#        * Scheduler health (heartbeat, critical section duration)
+#        * Task execution (success/failure rates, durations)
+#        * Executor utilization (open slots, queued tasks)
+#        * DAG processing (parse times, processes)
+#    - Set up alerts for critical metrics
+#
+# 7. SET UP RETENTION POLICIES
+#    - Define retention in InfluxDB bucket (30d, 90d, etc.)
+#    - Create downsampling tasks for long-term storage
+#    - Archive historical data if needed
+#
+# ============================================================
