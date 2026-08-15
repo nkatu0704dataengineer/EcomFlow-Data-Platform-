@@ -66,15 +66,6 @@
   # This matches Airflow's default StatsD naming convention.
   metric_separator = "."
 
-  # DataDog extensions: DISABLED
-  # Airflow uses standard StatsD protocol, not DataDog-specific
-  # extensions (e.g., histogram type, service checks).
-<<<<<<< HEAD
-=======
-  # Note: parse_datadog_tags and datadog_extensions fields are not
-  # included as they are not supported in this Telegraf version.
->>>>>>> 8f9b2797c16ed3bf3891e554134cad0f185f9cd1
-
 
   # ----------------------------------------------------------
   # Performance & Buffer Settings
