@@ -74,7 +74,7 @@
             "type": "influxdb",
             "uid": "InfluxDB-EcomFlow"
           },
-          "query": "from(bucket: \"${INFLUXDB_BUCKET}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.task.success\")\n  |> filter(fn: (r) => r[\"_field\"] == \"counter\")\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)\n  |> yield(name: \"task_success\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.task.success\")\n  |> filter(fn: (r) => r[\"_field\"] == \"counter\")\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)\n  |> yield(name: \"task_success\")",
           "refId": "A"
         }
       ],
@@ -137,7 +137,7 @@
             "type": "influxdb",
             "uid": "InfluxDB-EcomFlow"
           },
-          "query": "from(bucket: \"${INFLUXDB_BUCKET}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.task.failed\")\n  |> filter(fn: (r) => r[\"_field\"] == \"counter\")\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)\n  |> yield(name: \"task_failed\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.task.failed\")\n  |> filter(fn: (r) => r[\"_field\"] == \"counter\")\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)\n  |> yield(name: \"task_failed\")",
           "refId": "A"
         }
       ],
@@ -196,7 +196,7 @@
             "type": "influxdb",
             "uid": "InfluxDB-EcomFlow"
           },
-          "query": "from(bucket: \"${INFLUXDB_BUCKET}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.executor.queued_tasks\")\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\")\n  |> last()\n  |> yield(name: \"queued_tasks\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.executor.queued_tasks\")\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\")\n  |> last()\n  |> yield(name: \"queued_tasks\")",
           "refId": "A"
         }
       ],
@@ -255,7 +255,7 @@
             "type": "influxdb",
             "uid": "InfluxDB-EcomFlow"
           },
-          "query": "from(bucket: \"${INFLUXDB_BUCKET}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.executor.running_tasks\")\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\")\n  |> last()\n  |> yield(name: \"running_tasks\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.executor.running_tasks\")\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\")\n  |> last()\n  |> yield(name: \"running_tasks\")",
           "refId": "A"
         }
       ],
@@ -373,7 +373,7 @@
             "type": "influxdb",
             "uid": "InfluxDB-EcomFlow"
           },
-          "query": "from(bucket: \"${INFLUXDB_BUCKET}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.task.success\")\n  |> filter(fn: (r) => r[\"_field\"] == \"counter\")\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: false)\n  |> yield(name: \"Success\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.task.success\")\n  |> filter(fn: (r) => r[\"_field\"] == \"counter\")\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: false)\n  |> yield(name: \"Success\")",
           "refId": "A"
         },
         {
@@ -381,7 +381,7 @@
             "type": "influxdb",
             "uid": "InfluxDB-EcomFlow"
           },
-          "query": "from(bucket: \"${INFLUXDB_BUCKET}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.task.failed\")\n  |> filter(fn: (r) => r[\"_field\"] == \"counter\")\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: false)\n  |> yield(name: \"Failed\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.task.failed\")\n  |> filter(fn: (r) => r[\"_field\"] == \"counter\")\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: false)\n  |> yield(name: \"Failed\")",
           "refId": "B"
         }
       ],
@@ -468,7 +468,7 @@
             "type": "influxdb",
             "uid": "InfluxDB-EcomFlow"
           },
-          "query": "from(bucket: \"${INFLUXDB_BUCKET}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.executor.queued_tasks\")\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"Queued\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.executor.queued_tasks\")\n  |> filter(fn: (r) => r[\"_field\"] == \"gauge\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"Queued\")",
           "refId": "A"
         }
       ],
@@ -555,7 +555,7 @@
             "type": "influxdb",
             "uid": "InfluxDB-EcomFlow"
           },
-          "query": "from(bucket: \"${INFLUXDB_BUCKET}\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.scheduler.heartbeat\")\n  |> filter(fn: (r) => r[\"_field\"] == \"counter\")\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)\n  |> yield(name: \"Heartbeat\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.scheduler.heartbeat\")\n  |> filter(fn: (r) => r[\"_field\"] == \"counter\")\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)\n  |> yield(name: \"Heartbeat\")",
           "refId": "A"
         }
       ],
