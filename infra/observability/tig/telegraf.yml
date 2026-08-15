@@ -136,7 +136,7 @@
   # EXCEPTION:
   #   If you need to track rapid task completions (< 1 second),
   #   use "ms".
-  precision = "s"
+  precision = "1s"
 
   # ----------------------------------------------------------
   # Metric Buffering

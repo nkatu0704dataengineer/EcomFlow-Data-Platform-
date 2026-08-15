@@ -69,8 +69,8 @@
   # DataDog extensions: DISABLED
   # Airflow uses standard StatsD protocol, not DataDog-specific
   # extensions (e.g., histogram type, service checks).
-  parse_data_dog_tags = false
-  datadog_extensions = false
+  # Note: parse_datadog_tags and datadog_extensions fields are not
+  # included as they are not supported in this Telegraf version.
 
 
   # ----------------------------------------------------------
