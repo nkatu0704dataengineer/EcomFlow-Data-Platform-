@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from include.framework.spark.models.metadata_result import Metadata
-from include.framework.spark.models.validation_result import ValidationResult
+from include.framework.bronze_spark.models.metadata_result import Metadata
+from include.framework.bronze_spark.models.validation_result import ValidationResult
 
 
 @dataclass(slots=True)

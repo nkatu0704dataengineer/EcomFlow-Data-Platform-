@@ -5,6 +5,7 @@
 # ///
 # DBTITLE 1,Configure Parameters
 # Create widgets for job parameters
+
 dbutils.widgets.text("layer", "bronze", "Layer")
 dbutils.widgets.text("catalog_name", "ecomflow", "Catalog Name")
 dbutils.widgets.text("schema_name", "ecom_bronze_v2", "Schema Name")
@@ -35,17 +36,18 @@ print(f"Running {layer} pipeline for table: {catalog_name}.{schema_name}.{table_
 import sys
 from pathlib import Path
 
-# Add package root to Python path
-package_root = Path("/Workspace/Users/tumaxpro99@gmail.com/EcomFlow-Data-Platform-")
-if str(package_root) not in sys.path:
-    sys.path.insert(0, str(package_root))
+# Add package root to Python path dynamically
+import os
+package_root = os.path.abspath(os.path.join(os.getcwd(), '..'))
+if package_root not in sys.path:
+    sys.path.insert(0, package_root)
 
 print(f"Package root added to path: {package_root}")
 
 # COMMAND ----------
 
 # DBTITLE 1,Run Pipeline
-from include.framework.spark.pipeline import run_pipeline
+from include.framework.bronze_spark.pipeline import run_pipeline
 
 # If table_name is empty, process all tables in the schema
 if not table_name or table_name.strip() == "":

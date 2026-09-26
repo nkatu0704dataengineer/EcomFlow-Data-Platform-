@@ -25,18 +25,20 @@ try:
     # Standard Python: use __file__
     package_root = Path(__file__).resolve().parent.parent.parent.parent
 except NameError:
-    # Databricks: __file__ not defined, use workspace path
-    package_root = Path("/Workspace/Users/tumaxpro99@gmail.com/EcomFlow-Data-Platform-")
+    # Databricks: __file__ not defined, assume running in a subfolder and get root
+    import os
+    package_root = Path(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
 if str(package_root) not in sys.path:
     sys.path.insert(0, str(package_root))
 
 from datetime import datetime
 
+
 from pyspark.sql import DataFrame
 
-from include.framework.spark.models.metadata_result import Metadata
-from include.framework.spark.models.validation_result import ValidationResult
+from include.framework.bronze_spark.models.metadata_result import Metadata
+from include.framework.bronze_spark.models.validation_result import ValidationResult
 
 def generate_metadata(
         df: DataFrame,
