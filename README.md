@@ -20,23 +20,23 @@ The platform operates on a strict **Medallion Architecture**, seamlessly ingesti
 
 ```mermaid
 graph TD
-    subgraph Data Sources
+    subgraph Data_Sources ["Data Sources"]
         SRC1[Web Tracking]
         SRC2[App Events]
         SRC3[Transactions]
     end
 
-    subgraph Medallion Architecture (Databricks / Spark)
+    subgraph Medallion ["Medallion Architecture (Databricks / Spark)"]
         BRONZE[(🥉 Bronze<br/>Raw / Immutable)]
         SILVER[(🥈 Silver<br/>Cleansed / Filtered)]
         GOLD[(🥇 Gold<br/>Business Metrics)]
     end
 
-    subgraph Orchestration
+    subgraph Orchestration_Layer ["Orchestration"]
         AIRFLOW((Apache Airflow<br/>Orchestrator))
     end
 
-    subgraph TIG Observability Stack
+    subgraph TIG_Stack ["TIG Observability Stack"]
         TELEGRAF(Telegraf<br/>StatsD Receiver)
         INFLUX[(InfluxDB)]
         GRAFANA(Grafana Dashboards)
