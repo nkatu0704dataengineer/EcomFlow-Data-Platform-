@@ -1,23 +1,10 @@
 {
   "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
+    "list": []
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
+  "graphTooltip": 1,
   "id": null,
   "links": [],
   "liveNow": false,
@@ -30,9 +17,9 @@
         "x": 0,
         "y": 0
       },
-      "id": 100,
+      "id": 90,
       "panels": [],
-      "title": "DAG Run Performance",
+      "title": "\u23f1\ufe0f DAG Run Duration",
       "type": "row"
     },
     {
@@ -52,21 +39,21 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
             "hideFrom": {
               "tooltip": false,
               "viz": false,
               "legend": false
             },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 6,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "never",
-            "spanNulls": false,
+            "showPoints": "always",
+            "spanNulls": true,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -87,10 +74,71 @@
           },
           "unit": "ms"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 8,
+        "h": 9,
         "w": 24,
         "x": 0,
         "y": 1
@@ -98,14 +146,17 @@
       "id": 1,
       "options": {
         "legend": {
-          "calcs": ["mean", "max"],
+          "calcs": [
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "none"
+          "sort": "desc"
         }
       },
       "pluginVersion": "11.2.0",
@@ -115,11 +166,35 @@
             "type": "influxdb",
             "uid": "InfluxDB-EcomFlow"
           },
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\" ] =~ /^airflow\\.dagrun\\.duration\\.success\\..+$/)\n  |> filter(fn: (r) => r[\"_field\"] == \"p50\" or r[\"_field\"] == \"p95\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"dag_duration\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.dagrun.duration.success.ecomflow_bronze\")\n  |> filter(fn: (r) => r[\"_field\"] == \"mean\")\n  |> drop(columns: [\"host\", \"metric_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> set(key: \"_field\", value: \"Bronze DAG\")\n  |> yield(name: \"bronze\")",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-EcomFlow"
+          },
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.dagrun.duration.success.ecomflow_silver\")\n  |> filter(fn: (r) => r[\"_field\"] == \"mean\")\n  |> drop(columns: [\"host\", \"metric_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> set(key: \"_field\", value: \"Silver DAG\")\n  |> yield(name: \"silver\")",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-EcomFlow"
+          },
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.dagrun.duration.success.ecomflow_gold\")\n  |> filter(fn: (r) => r[\"_field\"] == \"mean\")\n  |> drop(columns: [\"host\", \"metric_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> set(key: \"_field\", value: \"Gold DAG\")\n  |> yield(name: \"gold\")",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-EcomFlow"
+          },
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.dagrun.duration.success.ecomflow_master\")\n  |> filter(fn: (r) => r[\"_field\"] == \"mean\")\n  |> drop(columns: [\"host\", \"metric_type\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> set(key: \"_field\", value: \"Master DAG\")\n  |> yield(name: \"master\")",
+          "refId": "D"
         }
       ],
-      "title": "DAG Run Duration (p50/p95)",
+      "title": "DAG Run Duration (Mean)",
       "type": "timeseries"
     },
     {
@@ -128,296 +203,11 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
-      },
-      "id": 101,
-      "panels": [],
-      "title": "Task Performance",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "InfluxDB-EcomFlow"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p99"
-            },
-            "properties": [
-              {
-                "id": "custom.lineWidth",
-                "value": 1
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "orange"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p95"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "yellow"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p50"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "green"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
         "y": 10
       },
-      "id": 2,
-      "options": {
-        "legend": {
-          "calcs": ["mean", "last"],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.2.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "InfluxDB-EcomFlow"
-          },
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^airflow\\.task\\.duration\\..+$/)\n  |> filter(fn: (r) => r[\"_field\"] == \"p50\" or r[\"_field\"] == \"p95\" or r[\"_field\"] == \"p99\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"task_duration\")",
-          "refId": "A"
-        }
-      ],
-      "title": "Task Duration Percentiles (p50/p95/p99)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "InfluxDB-EcomFlow"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 5000
-              },
-              {
-                "color": "red",
-                "value": 10000
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "_measurement"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Task"
-              },
-              {
-                "id": "custom.width",
-                "value": 300
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p95"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "P95 Duration (ms)"
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-background"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p99"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "P99 Duration (ms)"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p50"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "P50 Duration (ms)"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 10
-      },
-      "id": 3,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": ["sum"],
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "P95 Duration (ms)"
-          }
-        ]
-      },
-      "pluginVersion": "11.2.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "InfluxDB-EcomFlow"
-          },
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^airflow\\.task\\.duration\\..+$/)\n  |> filter(fn: (r) => r[\"_field\"] == \"p50\" or r[\"_field\"] == \"p95\" or r[\"_field\"] == \"p99\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> pivot(rowKey:[\"_time\", \"_measurement\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> group(columns: [\"_measurement\"])\n  |> mean()\n  |> keep(columns: [\"_measurement\", \"p50\", \"p95\", \"p99\"])\n  |> yield(name: \"slowest_tasks\")",
-          "refId": "A"
-        }
-      ],
-      "title": "Slowest Tasks (by P95)",
-      "type": "table"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 18
-      },
-      "id": 102,
+      "id": 91,
       "panels": [],
-      "title": "Throughput",
+      "title": "\ud83d\udcca Throughput",
       "type": "row"
     },
     {
@@ -438,20 +228,20 @@
             "barAlignment": 0,
             "drawStyle": "bars",
             "fillOpacity": 80,
-            "gradientMode": "none",
+            "gradientMode": "scheme",
             "hideFrom": {
               "tooltip": false,
               "viz": false,
               "legend": false
             },
             "lineInterpolation": "linear",
-            "lineWidth": 1,
+            "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
             "showPoints": "never",
-            "spanNulls": false,
+            "spanNulls": true,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -472,25 +262,43 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 19
+        "y": 11
       },
       "id": 4,
       "options": {
         "legend": {
-          "calcs": ["sum"],
+          "calcs": [
+            "sum"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "none"
+          "sort": "desc"
         }
       },
       "pluginVersion": "11.2.0",
@@ -500,7 +308,7 @@
             "type": "influxdb",
             "uid": "InfluxDB-EcomFlow"
           },
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.ti_successes\")\n  |> filter(fn: (r) => r[\"_field\"] == \"counter\")\n  |> aggregateWindow(every: v.windowPeriod, fn: sum, createEmpty: false)\n  |> yield(name: \"task_throughput\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.ti_successes\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: 1m, fn: sum, createEmpty: false)\n  |> set(key: \"_field\", value: \"Tasks / min\")\n  |> yield(name: \"rate\")",
           "refId": "A"
         }
       ],
@@ -524,21 +332,21 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 20,
+            "fillOpacity": 10,
             "gradientMode": "none",
             "hideFrom": {
               "tooltip": false,
               "viz": false,
               "legend": false
             },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
             "showPoints": "never",
-            "spanNulls": false,
+            "spanNulls": true,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -559,25 +367,44 @@
           },
           "unit": "ms"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 19
+        "y": 11
       },
       "id": 5,
       "options": {
         "legend": {
-          "calcs": ["mean", "max"],
+          "calcs": [
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "none"
+          "sort": "desc"
         }
       },
       "pluginVersion": "11.2.0",
@@ -587,17 +414,243 @@
             "type": "influxdb",
             "uid": "InfluxDB-EcomFlow"
           },
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.dag_processing.total_parse_time\")\n  |> filter(fn: (r) => r[\"_field\"] == \"p50\" or r[\"_field\"] == \"p95\" or r[\"_field\"] == \"p99\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> yield(name: \"dag_parse_time\")",
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.dag_processing.total_parse_time\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> set(key: \"_field\", value: \"Parse Time\")\n  |> yield(name: \"pt\")",
           "refId": "A"
         }
       ],
-      "title": "DAG Parse Time (p50/p95/p99)",
+      "title": "DAG Parse Time",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "id": 92,
+      "panels": [],
+      "title": "\ud83d\udd04 Scheduler Loop",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "InfluxDB-EcomFlow"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-EcomFlow"
+          },
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.scheduler.scheduler_loop_duration\")\n  |> filter(fn: (r) => r[\"_field\"] == \"mean\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> set(key: \"_field\", value: \"Loop Duration (Mean)\")\n  |> yield(name: \"loop\")",
+          "refId": "A"
+        }
+      ],
+      "title": "Scheduler Loop Duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "InfluxDB-EcomFlow"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "InfluxDB-EcomFlow"
+          },
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"airflow.scheduler.dagruns.running\")\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> set(key: \"_field\", value: \"DAG Runs\")\n  |> yield(name: \"runs\")",
+          "refId": "A"
+        }
+      ],
+      "title": "DAGs Running Concurrently",
       "type": "timeseries"
     }
   ],
   "refresh": "1m",
   "schemaVersion": 39,
-  "tags": ["ecomflow", "pipeline", "performance"],
+  "tags": [
+    "ecomflow",
+    "pipeline",
+    "performance"
+  ],
   "templating": {
     "list": []
   },
@@ -609,6 +662,5 @@
   "timezone": "",
   "title": "Pipeline Performance",
   "uid": "ecomflow-pipeline-performance",
-  "version": 1,
-  "weekStart": ""
+  "version": 0
 }

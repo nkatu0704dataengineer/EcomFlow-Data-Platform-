@@ -89,6 +89,7 @@ def run_pipeline(
 
     # Stage 2: Validate data quality (diagnostic only - reports issues but doesn't block)
     validation_result = validate_dataframe(dataframe)
+    
     if not validation_result.is_valid:
         # Only raise error if DataFrame is empty (critical condition)
         error_msg = " ".join(validation_result.error_messages)

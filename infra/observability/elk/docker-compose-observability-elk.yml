@@ -75,47 +75,6 @@ services:
 
 
   # ----------------------------------------------------------
-  # Filebeat
-  # ----------------------------------------------------------
-  # Uses custom entrypoint to solve Windows bind mount permission issue.
-  # The entrypoint copies the read-only config to internal filesystem
-  # with strict permissions before starting Filebeat.
-  filebeat:
-    image: docker.elastic.co/beats/filebeat:8.15.3
-    container_name: ecomflow-filebeat
-    restart: unless-stopped
-
-    user: root
-
-    # Override default entrypoint to use our bootstrap script
-    entrypoint: ["/bin/bash", "/usr/local/bin/filebeat-entrypoint.sh"]
-
-    volumes:
-      # Bootstrap script
-      - ./filebeat/entrypoint.sh:/usr/local/bin/filebeat-entrypoint.sh:ro
-
-      # Filebeat configuration (mounted to /tmp, not final location)
-      # The entrypoint will copy it to /usr/share/filebeat/filebeat.yml
-      - ./filebeat/filebeat.yml:/tmp/filebeat.yml:ro
-
-      # Existing Airflow logs - READ ONLY
-      - ecom-flow_4149da_airflow_logs:/usr/local/airflow/logs:ro
-
-      # Filebeat registry must survive container restarts
-      - ecomflow_filebeat_data:/usr/share/filebeat/data
-
-      # Docker socket for optional container metadata enrichment
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-
-    networks:
-      - ecom-flow_4149da_airflow
-
-    depends_on:
-      logstash:
-        condition: service_started
-
-
-  # ----------------------------------------------------------
   # Kibana
   # ----------------------------------------------------------
   kibana:
@@ -147,16 +106,8 @@ volumes:
   # Persistent Elasticsearch index data
   ecomflow_elasticsearch_data:
 
-  # Persistent Filebeat registry
-  ecomflow_filebeat_data:
-
   # Persistent Elasticsearch logs
   ecomflow_elasticsearch_logs:
-
-  # Existing Airflow log volume created by Astro.
-  # IMPORTANT: do not create a new volume for Airflow logs.
-  ecom-flow_4149da_airflow_logs:
-    external: true
 
 
 # ============================================================
