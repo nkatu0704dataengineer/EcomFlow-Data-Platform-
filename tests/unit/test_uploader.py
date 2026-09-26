@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from include.framework.spark import uploader
+from include.framework.bronze_spark import uploader
 
 
 class FakeMinio:

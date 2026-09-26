@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from pyspark.sql import SparkSession
 
-from include.framework.spark.metadata import generate_metadata
-from include.framework.spark.models.pipeline_result import PipelineResult
-from include.framework.spark.reader import read_delta_table
-from include.framework.spark.uploader import upload_directory_to_volume, UploadError
-from include.framework.spark.validator import validate_dataframe
-from include.framework.spark.writer import write_csv
+from include.framework.bronze_spark.metadata import generate_metadata
+from include.framework.bronze_spark.models.pipeline_result import PipelineResult
+from include.framework.bronze_spark.reader import read_delta_table
+from include.framework.bronze_spark.uploader import upload_directory_to_volume, UploadError
+from include.framework.bronze_spark.validator import validate_dataframe
+from include.framework.bronze_spark.writer import write_csv
 
 
 def run_pipeline(

@@ -1,5 +1,4 @@
 # Databricks notebook source
-# DBTITLE 1,Gold Single Table Processor
 """
 Gold Single Table Processor
 
@@ -73,12 +72,12 @@ try:
         target_table=table_name,
         target_volume=volume_name
     )
-    
-    logger.info(f"✅ SUCCESS: {table_name}")
+
+    logger.info(f"SUCCESS: {table_name}")
     logger.info(f"   Rows: {result.metadata_result.row_count}")
     logger.info(f"   Duration: {result.processing_duration:.2f}s")
     logger.info(f"{'='*80}")
-    
+
     # Output for downstream tasks
     dbutils.notebook.exit({
         "status": "SUCCESS",
@@ -86,12 +85,9 @@ try:
         "rows": result.metadata_result.row_count,
         "duration": result.processing_duration
     })
-    
+
 except Exception as e:
-    logger.error(f"❌ FAILED: {table_name}")
+    logger.error(f"FAILED: {table_name}")
     logger.error(f"   Error: {str(e)}")
     logger.error(f"{'='*80}")
     raise
-
-# COMMAND ----------
-

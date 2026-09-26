@@ -28,7 +28,7 @@ if project_root not in sys.path:
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import col, count, when, sum as spark_sum
 
-from include.framework.spark.models.validation_result import ValidationResult
+from include.framework.bronze_spark.models.validation_result import ValidationResult
 
 def collect_dataframe_metrics(df: DataFrame) -> tuple[int, int, dict[str, int]]:
     row_count = df.count()

@@ -13,6 +13,7 @@ Databricks is responsible for:
 
 from __future__ import annotations
 
+# pyrefly: ignore [missing-import]
 from airflow.providers.databricks.operators.databricks import DatabricksRunNowOperator
 
 from include.config.databricks import get_databricks_conn_id

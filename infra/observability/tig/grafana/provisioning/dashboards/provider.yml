@@ -21,14 +21,14 @@ providers:
     
     # Disable dashboard deletion via UI
     # Dashboards are managed as code
-    disableDeletion: false
+    disableDeletion: true
     
     # Allow updating dashboards via UI
     # Changes will NOT persist (overwritten on restart)
-    updateIntervalSeconds: 30
+    updateIntervalSeconds: 10
     
     # Allow inserting new dashboards via UI
-    allowUiUpdates: true
+    allowUiUpdates: false
     
     options:
       # Path where dashboard JSON files are stored

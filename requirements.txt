@@ -14,4 +14,5 @@ pyarrow>=12.0.0
 databricks-sdk~=0.63
 apache-airflow-providers-databricks~=7.5
 
-
+# Observability (Metrics)
+statsd>=3.3.0
