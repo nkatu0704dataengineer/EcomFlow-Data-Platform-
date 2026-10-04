@@ -1,0 +1,30 @@
+services:
+  scheduler:
+    volumes:
+      - C:\Users\Admin\StockFlow:/usr/local/airflow/include/stockflow
+    networks:
+      - default
+      - stockflow_net
+  api-server:
+    volumes:
+      - C:\Users\Admin\StockFlow:/usr/local/airflow/include/stockflow
+    networks:
+      - default
+      - stockflow_net
+  triggerer:
+    volumes:
+      - C:\Users\Admin\StockFlow:/usr/local/airflow/include/stockflow
+    networks:
+      - default
+      - stockflow_net
+  dag-processor:
+    volumes:
+      - C:\Users\Admin\StockFlow:/usr/local/airflow/include/stockflow
+    networks:
+      - default
+      - stockflow_net
+
+networks:
+  stockflow_net:
+    external: true
+    name: stockflow_stockflow_net

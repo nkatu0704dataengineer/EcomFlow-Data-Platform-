@@ -85,6 +85,13 @@ The system relies on 4 independent Directed Acyclic Graphs (DAGs) orchestrated b
 
 ---
 
+## 💹 StockFlow Integration
+
+EcomFlow's Airflow instance also orchestrates the **StockFlow** project—a separate financial data lakehouse. 
+By utilizing Docker Compose Overrides (`docker-compose.override.yml`), the EcomFlow Airflow containers are attached directly to the `stockflow_stockflow_net` Docker network. This allows Airflow to trigger StockFlow DAGs (`stockflow_dag.py`) and seamlessly connect to StockFlow's internal Kafka and PostgreSQL containers without routing through the Windows host firewall.
+
+---
+
 ## 📂 Repository Structure
 
 ```text
