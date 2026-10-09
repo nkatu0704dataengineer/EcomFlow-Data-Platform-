@@ -1,0 +1,14 @@
+apiVersion: 1
+datasources:
+  - name: PostgreSQL-StockFlow
+    type: postgres
+    uid: postgres-stockflow
+    access: proxy
+    url: host.docker.internal:5433
+    user: stockflow
+    secureJsonData:
+      password: stockflow2026
+    database: stockflow_gold
+    jsonData:
+      sslmode: disable
+      postgresVersion: 16

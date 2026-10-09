@@ -1,16 +1,3 @@
-# ============================================================
-# EcomFlow Observability - Grafana Dashboard Provider
-# ============================================================
-# Purpose:
-#   Configure where Grafana should load dashboards from.
-#   Enables dashboard-as-code (version control for dashboards).
-#
-# Responsibility:
-#   ✓ Point Grafana to dashboard JSON files
-#   ✓ Auto-import on startup
-#   ✓ Configure dashboard update behavior
-# ============================================================
-
 apiVersion: 1
 
 providers:
@@ -18,23 +5,20 @@ providers:
     orgId: 1
     folder: 'EcomFlow'
     type: file
-    
-    # Disable dashboard deletion via UI
-    # Dashboards are managed as code
     disableDeletion: true
-    
-    # Allow updating dashboards via UI
-    # Changes will NOT persist (overwritten on restart)
     updateIntervalSeconds: 10
-    
-    # Allow inserting new dashboards via UI
     allowUiUpdates: false
-    
     options:
-      # Path where dashboard JSON files are stored
-      # Must match volume mount in grafana.yml
-      path: /etc/grafana/provisioning/dashboards/json
-      
-      # Watch for changes and reload
+      path: /etc/grafana/provisioning/dashboards/json/ecomflow
       foldersFromFilesStructure: false
 
+  - name: 'StockFlow TIG'
+    orgId: 1
+    folder: 'StockFlow'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards/json/stockflow
+      foldersFromFilesStructure: false

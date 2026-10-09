@@ -90,6 +90,9 @@ The system relies on 4 independent Directed Acyclic Graphs (DAGs) orchestrated b
 EcomFlow's Airflow instance also orchestrates the **StockFlow** project—a separate financial data lakehouse. 
 By utilizing Docker Compose Overrides (`docker-compose.override.yml`), the EcomFlow Airflow containers are attached directly to the `stockflow_stockflow_net` Docker network. This allows Airflow to trigger StockFlow DAGs (`stockflow_dag.py`) and seamlessly connect to StockFlow's internal Kafka and PostgreSQL containers without routing through the Windows host firewall.
 
+**Shared Observability:**
+In addition to orchestration, StockFlow seamlessly integrates with EcomFlow's **TIG (Telegraf, InfluxDB, Grafana) Observability Stack**. Telegraf runs natively within the StockFlow environment, collecting system metrics and pushing them to the centralized EcomFlow InfluxDB. This allows for unified monitoring of both E-commerce and Financial data pipelines under a single Grafana instance.
+
 ---
 
 ## 📂 Repository Structure
@@ -168,5 +171,9 @@ Grafana comes pre-provisioned with **3 Core Dashboards** to monitor system healt
 1. 🌍 **EcomFlow Overview**: A holistic view of task successes, queue depths, and general workload.
 2. 🫀 **Airflow Health**: Monitors the scheduler heartbeat, critical section durations, and parsing performance to prevent orchestration bottlenecks.
 3. ⏱️ **Pipeline Performance**: Advanced SLA tracking featuring separated DAG Run Duration metrics (Bronze vs. Silver vs. Gold vs. Master) and task throughput rates.
+
+Additionally, the centralized TIG Stack hosts **StockFlow** observability dashboards:
+- 📊 **StockFlow Pipeline Monitor**: Deep infrastructure insights for StockFlow's Docker containers (CPU, RAM, Network, Disk I/O).
+- ❤️ **StockFlow Data Pulse**: Real-time ingestion metrics tracking the flow rate of Stock and Crypto messages directly from PostgreSQL.
 
 > **Note:** Dashboards are managed via code (`infra/observability/tig/grafana/provisioning/dashboards/json/`) ensuring they are version-controlled and reproducible.
